@@ -14,7 +14,7 @@ dependencies:
 - mkl
 - numpy
 - scipy >= 0.17, !=1.0.0  # 1.0 has bug: UnboundLocalError: local variable 'iprint' referenced before assignment
-- matplotlib
+- matplotlib >= 2.1
 - pyqt>=5.9
 - vtk>=8
 - pandas
