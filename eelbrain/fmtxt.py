@@ -1317,10 +1317,10 @@ class Table(FMTextElement):
                 self._active_row.append(Cell())
         self._active_row = None
 
-    def cells(self, *cells):
+    def cells(self, *cells, **kwargs):
         "Add several simple cells with one command"
         for cell in cells:
-            self.cell(cell)
+            self.cell(cell, **kwargs)
 
     def midrule(self, span=None):
         """Add a midrule
@@ -2214,7 +2214,7 @@ def im_table(ims, header=None, name="im_table"):
 
     svg.append("</svg>")
     buf = '\n'.join(svg)
-    return Image(name, 'svg', buf=buf)
+    return Image(name, 'svg', buf=buf.encode())
 
 
 def _array_as_png(im):

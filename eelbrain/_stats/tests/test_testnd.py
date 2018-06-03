@@ -1,17 +1,19 @@
 # Author: Christian Brodbeck <christianbrodbeck@nyu.edu>
+from itertools import product
 import pickle
 import logging
 import sys
 
-from nose.tools import (eq_, ok_, assert_equal, assert_not_equal,
-                        assert_greater, assert_greater_equal, assert_less,
-                        assert_in, assert_not_in, assert_raises)
+from nose.tools import (
+    eq_, ok_, assert_equal, assert_not_equal, assert_almost_equal,
+    assert_greater, assert_greater_equal, assert_less, assert_in, assert_not_in,
+    assert_raises)
 import numpy as np
 from numpy.testing import assert_array_equal, assert_allclose
 
 import eelbrain
 from eelbrain import (Dataset, NDVar, Categorial, Scalar, UTS, Sensor, configure,
-                      datasets, testnd, set_log_level, cwt_morlet)
+                      datasets, test, testnd, set_log_level, cwt_morlet)
 from eelbrain._exceptions import ZeroVariance
 from eelbrain._stats.testnd import (Connectivity, _ClusterDist, label_clusters,
                                     _MergedTemporalClusterDist, find_peaks)
@@ -354,9 +356,16 @@ def test_corr():
     utsnd = ds['utsnd']
     utsnd.x[:, 3:5, 50:65] += Y.x[:, None, None]
 
+    res = testnd.corr('utsnd', 'Y', ds=ds)
+    repr(res)
+    for s, t in product('01234', (0.1, 0.2, 0.35)):
+        target = test.Correlation(utsnd.sub(sensor=s, time=t), Y).r
+        assert_almost_equal(res.r.sub(sensor=s, time=t), target, 10)
     res = testnd.corr('utsnd', 'Y', 'rm', ds=ds)
     repr(res)
-    res = testnd.corr('utsnd', 'Y', 'rm', ds=ds, samples=10, pmin=0.05)
+    res = testnd.corr('utsnd', 'Y', ds=ds, samples=10, pmin=0.05)
+    repr(res)
+    res = testnd.corr('utsnd', 'Y', ds=ds, samples=10, tfce=True)
     repr(res)
 
     # persistence

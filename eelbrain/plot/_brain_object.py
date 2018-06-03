@@ -879,16 +879,6 @@ class Brain(TimeSlicer, surfer.Brain):
         surfer.Brain.set_surf(self, surf)
         self.set_parallel_view(scale=True)
 
-    def set_time(self, time):
-        """Set the time point if data with a time dimension is displayed
-
-        Parameters
-        ----------
-        time : scalar
-            Time.
-        """
-        self._set_time(time, True)
-
     def set_title(self, title):
         "Set the window title"
         self._frame.SetTitle(str(title))

@@ -52,6 +52,7 @@ from .._exceptions import OldVersionError, ZeroVariance
 from .._report import enumeration, format_timewindow, ms
 from .._utils import LazyProperty
 from .._utils.numpy_utils import FULL_AXIS_SLICE
+from .._utils.system import caffeine
 from . import opt, stats
 from .connectivity import Connectivity, find_peaks
 from .connectivity_opt import merge_labels, tfce_increment
@@ -433,6 +434,7 @@ class t_contrast_rel(_Result):
 
     _state_specific = ('X', 'contrast', 't', 'tail')
 
+    @caffeine
     def __init__(self, Y, X, contrast, match=None, sub=None, ds=None, tail=0,
                  samples=0, pmin=None, tmin=None, tfce=False, tstart=None,
                  tstop=None, parc=None, force_permutation=False, **criteria):
@@ -567,6 +569,7 @@ class corr(_Result):
     """
     _state_specific = ('X', 'norm', 'n', 'df', 'r')
 
+    @caffeine
     def __init__(self, Y, X, norm=None, sub=None, ds=None, samples=0,
                  pmin=None, rmin=None, tfce=False, tstart=None, tstop=None,
                  match=None, parc=None, **criteria):
@@ -611,14 +614,15 @@ class corr(_Result):
             raise ValueError("Only one of pmin, rmin and tfce can be specified")
         else:
             if pmin is not None:
-                threshold = stats.rtest_r(pmin, df)
+                r_threshold = threshold = stats.rtest_r(pmin, df)
             elif rmin is not None:
-                threshold = abs(rmin)
+                r_threshold = threshold = abs(rmin)
             elif tfce:
                 threshold = 'tfce'
+                r_threshold = None
             else:
-                threshold = None
-            info = _cs.stat_info('r', threshold)
+                r_threshold = threshold = None
+            info = _cs.stat_info('r', r_threshold)
 
             cdist = _ClusterDist(Y, samples, threshold, 0, 'r', name, tstart,
                                  tstop, criteria, parc)
@@ -723,7 +727,7 @@ class ttest_1samp(_Result):
     ----------
     clusters : None | Dataset
         When performing a cluster permutation test, a Dataset of all clusters.
-    diff : NDVar
+    difference : NDVar
         The difference value entering the test (``y`` if popmean is 0).
     n : int
         Number of cases.
@@ -742,8 +746,9 @@ class ttest_1samp(_Result):
     -----
     Cases with zero variance are set to t=0.
     """
-    _state_specific = ('popmean', 'tail', 'n', 'df', 't', 'diff')
+    _state_specific = ('popmean', 'tail', 'n', 'df', 't', 'difference')
 
+    @caffeine
     def __init__(self, Y, popmean=0, match=None, sub=None, ds=None, tail=0,
                  samples=0, pmin=None, tmin=None, tfce=False, tstart=None,
                  tstop=None, parc=None, force_permutation=False, **criteria):
@@ -807,10 +812,15 @@ class ttest_1samp(_Result):
         self.n = n
         self.df = df
 
-        self.diff = diff
+        self.difference = diff
         self.t = t
 
         self._expand_state()
+
+    def __setstate__(self, state):
+        if 'diff' in state:
+            state['difference'] = state.pop('diff')
+        _Result.__setstate__(self, state)
 
     def _expand_state(self):
         _Result._expand_state(self)
@@ -822,9 +832,9 @@ class ttest_1samp(_Result):
         self.p_uncorrected = p_uncorr
 
         if self.samples:
-            self._default_plot_obj = [[self.diff, self.p]]
+            self._default_plot_obj = [[self.difference, self.p]]
         else:
-            self._default_plot_obj = [[self.diff, t]]
+            self._default_plot_obj = [[self.difference, t]]
 
     def _name(self):
         if self.Y:
@@ -920,6 +930,7 @@ class ttest_ind(_Result):
     _state_specific = ('X', 'c1', 'c0', 'tail', 't', 'n1', 'n0', 'df', 'c1_mean',
                        'c0_mean')
 
+    @caffeine
     def __init__(self, Y, X, c1=None, c0=None, match=None, sub=None, ds=None,
                  tail=0, samples=0, pmin=None, tmin=None, tfce=False,
                  tstart=None, tstop=None, parc=None, force_permutation=False, **criteria):
@@ -1131,6 +1142,7 @@ class ttest_rel(_Result):
     _state_specific = ('X', 'c1', 'c0', 'tail', 't', 'n', 'df', 'c1_mean',
                        'c0_mean')
 
+    @caffeine
     def __init__(self, Y, X, c1=None, c0=None, match=None, sub=None, ds=None,
                  tail=0, samples=0, pmin=None, tmin=None, tfce=False,
                  tstart=None, tstop=None, parc=None, force_permutation=False, **criteria):
@@ -1503,6 +1515,7 @@ class anova(_MultiEffectResult):
     """
     _state_specific = ('X', 'pmin', '_effects', '_dfs_denom', 'f')
 
+    @caffeine
     def __init__(self, Y, X, sub=None, ds=None, samples=0, pmin=None,
                  fmin=None, tfce=False, tstart=None, tstop=None, match=None,
                  parc=None, force_permutation=False, **criteria):

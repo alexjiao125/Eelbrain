@@ -2,9 +2,8 @@ name: eelbrain
 channels:
   - defaults
   - conda-forge
-  - christianbrodbeck
 dependencies:
-  - python=2.7
+  - python = 3
   - setuptools >= 17
   - cython >= 0.21
   - colormath >= 2.1
@@ -13,11 +12,11 @@ dependencies:
   - pillow
   - numpy >= 1.11
   - numpydoc
-  - Sphinx >= 1.6
+  - sphinx >= 1.6
   - scipy >= 0.17
   - nibabel >= 2.0
   - matplotlib >= 2.1
-  - wxpython >= 3.0
+  - wxpython >= 4.0
   - pip:
     - mne  # to avoid adding mayavi through PySurfer (when mayavi is imported
            # in readthedocs it blocks the build)

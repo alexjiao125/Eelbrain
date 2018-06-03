@@ -39,8 +39,7 @@ from .. import testnd
 from .._config import CONFIG
 from .._data_obj import (
     Datalist, Dataset, Factor, Var,
-    align, align1, all_equal, as_legal_dataset_key,
-    asfactor, assert_is_legal_dataset_key, combine)
+    align, align1, all_equal, assert_is_legal_dataset_key, combine)
 from .._exceptions import DefinitionError, DimensionMismatchError, OldVersionError
 from .._info import BAD_CHANNELS
 from .._io.fiff import KIT_NEIGHBORS
@@ -61,6 +60,7 @@ from .._stats.stats import ttest_t
 from .._stats.testnd import _MergedTemporalClusterDist
 from .._utils import WrappedFormater, ask, subp, keydefaultdict, log_level
 from .._utils.mne_utils import fix_annot_names, is_fake_mri
+from .._utils.numpy_utils import INT_TYPES
 from .definitions import (
     assert_dict_has_args, find_dependent_epochs,
     find_epochs_vars, find_test_vars, log_dict_change, log_list_change)
@@ -104,8 +104,6 @@ inv_re = re.compile("(free|fixed|loose\.\d+)-"  # orientation constraint
                     "(?:-((?:0\.)?\d+))?"  # depth weighting
                     "(?:-(pick_normal))?"
                     "$")  # pick normal
-
-INT_TYPES = (int, np.integer)
 
 # Eelbrain 0.24 raw/preprocessing pipeline
 LEGACY_RAW = {
@@ -178,6 +176,10 @@ class DictSet(object):
     def add(self, item):
         if item not in self._list:
             self._list.append(item)
+
+    def update(self, items):
+        for item in items:
+            self.add(item)
 
 
 class CacheDict(dict):
@@ -1346,6 +1348,11 @@ class MneExperiment(FileTree):
                 for test in invalid_cache['tests']:
                     rm['test-file'].add({'test': test})
                     rm['report-file'].add({'test': test})
+
+                # secondary cache files
+                for temp in tuple(rm):
+                    for stemp in self._secondary_cache[temp]:
+                        rm[stemp].update(rm[temp])
 
                 # find actual files to delete
                 log.debug("Outdated cache files:")

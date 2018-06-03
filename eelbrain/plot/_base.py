@@ -77,13 +77,14 @@ from matplotlib.ticker import FuncFormatter
 import numpy as np
 import PIL
 
+from .._colorspaces import symmetric_cmaps, zerobased_cmaps, ALPHA_CMAPS
 from .._config import CONFIG
+from .._data_obj import (Case, UTS, ascategorial, asndvar, assub, isnumeric,
+                         isdataobject, cellname)
 from .._utils import IS_WINDOWS, LazyProperty, intervals
 from .._utils.subp import command_exists
 from ..fmtxt import Image
-from .._colorspaces import symmetric_cmaps, zerobased_cmaps, ALPHA_CMAPS
-from .._data_obj import (Case, UTS, ascategorial, asndvar, assub, isnumeric,
-                         isdataobject, cellname)
+from ..mne_fixes import MNE_EPOCHS
 from functools import reduce
 
 
@@ -692,8 +693,11 @@ class PlotData(object):
             y = y._default_plot_obj
 
         sub = assub(sub, ds)
+        if isinstance(y, MNE_EPOCHS):
+            # Epochs are Iterators over arrays
+            y = asndvar(y, sub, ds)
 
-        if isinstance(y, (tuple, list)):
+        if isinstance(y, (tuple, list, Iterator)):
             if xax is not None:
                 raise TypeError(
                     "xax can only be used to divide y into different axes if y is "
@@ -939,6 +943,7 @@ class EelFigure(object):
     _default_xlabel_ax = -1
     _default_ylabel_ax = 0
     _make_axes = True
+    _can_set_vlim = False
     _can_set_ylim = False
     _can_set_xlim = False
 
@@ -2004,6 +2009,8 @@ class ColorBarMixin(object):
 
 class ColorMapMixin(ColorBarMixin):
     """takes care of color-map and includes color-bar"""
+    _can_set_vlim = True
+
     def __init__(self, epochs, cmap, vmax, vmin, contours, plots):
         ColorBarMixin.__init__(self, self.__get_cmap_params, epochs[0][0])
         self.__plots = plots  # can be empty list at __init__
@@ -2085,7 +2092,11 @@ class ColorMapMixin(ColorBarMixin):
         for p in self.__plots:
             p.set_vlim(vmin, vmax, meas)
         self._vlims[meas] = vmin, vmax
-        self.draw()
+
+        if self._can_set_ylim:
+            self.set_ylim(vmin, vmax)
+        else:
+            self.draw()
 
     def get_vlim(self, meas=None):
         "Retrieve colormap value limits as ``(vmin, vmax)`` tuple"
@@ -2264,7 +2275,7 @@ class Legend(EelFigure):
 class TimeController(object):
     # Link plots that have the TimeSlicer mixin
     def __init__(self, t=0, fixate=False):
-        self.plots = []
+        self.plots = []  # list of weakref to plots
         self.current_time = t
         self.fixate = fixate
 
@@ -2277,8 +2288,8 @@ class TimeController(object):
             self.merge(plot._time_controller)
 
     def iter_plots(self):
-        self.plots = [p for p in self.plots if p() is not None]
-        return self.plots
+        plots = (p() for p in self.plots)
+        return (p for p in plots if p is not None)
 
     def merge(self, time_controller):
         "Merge another TimeController into self"
@@ -2290,8 +2301,11 @@ class TimeController(object):
     def set_time(self, t, fixate):
         if t == self.current_time and fixate == self.fixate:
             return
-        for p in self.iter_plots():
-            p()._update_time_wrapper(t, fixate)
+        plots = tuple(self.iter_plots())
+        for p in plots:
+            t = p._validate_time(t)
+        for p in plots:
+            p._update_time_wrapper(t, fixate)
         self.current_time = t
         self.fixate = fixate
 
@@ -2353,6 +2367,16 @@ class TimeSlicer(object):
             new_i = max(0, current_i + offset)
         self._set_time(self._time_dim.times[new_i], True)
 
+    def set_time(self, time):
+        """Set the time point to display
+
+        Parameters
+        ----------
+        time : scalar
+            Time to display.
+        """
+        self._set_time(time, True)
+
     def _set_time(self, t, fixate=False):
         "Called by the plot"
         if self._time_controller is None:
@@ -2370,6 +2394,14 @@ class TimeSlicer(object):
 
     def _update_time(self, t, fixate):
         raise NotImplementedError
+
+    def _validate_time(self, t):
+        if self._time_dim is not None:
+            if t < self._time_dim.tmin:
+                return self._time_dim.tmin
+            elif t > self._time_dim.tmax:
+                return self._time_dim.tmax
+        return t
 
 
 class TimeSlicerEF(TimeSlicer):

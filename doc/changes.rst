@@ -8,6 +8,8 @@ New in 0.28
 
 * API changes:
 
+  - :attr:`testnd.ttest_1samp.diff` renamed to
+    :attr:`testnd.ttest_1samp.difference`.
   - :class:`plot.Histogram`: following :mod:`matplotlib`, the ``normed``
     parameter was renamed to ``density``.
 

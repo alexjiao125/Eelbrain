@@ -90,16 +90,12 @@ class _plt_im(object):
         self._data = data
         self._draw_contours()
 
-    def set_vlim(self, vmin, vmax=None, meas=None):
+    def set_vlim(self, v, vmax=None, meas=None):
         if self.im is None:
             return
         elif (meas is not None) and (self._meas != meas):
             return
-
-        if vmax is None:
-            _, vmax = self.im.get_clim()
-
-        vmin, vmax = _base.fix_vlim_for_cmap(vmin, vmax, self._cmap)
+        vmin, vmax = _base.fix_vlim_for_cmap(v, vmax, self._cmap)
         self.im.set_clim(vmin, vmax)
         self.vmin, self.vmax = self.im.get_clim()
 
@@ -174,9 +170,9 @@ class _ax_im_array(object):
         for l, p in zip(layers, self.layers):
             p.set_data(l, vlim)
 
-    def set_vlim(self, vmin, vmax, meas):
+    def set_vlim(self, v, vmax=None, meas=None):
         for l in self.layers:
-            l.set_vlim(vmin, vmax, meas)
+            l.set_vlim(v, vmax, meas)
 
 
 class Array(TimeSlicerEF, ColorMapMixin, XAxisMixin, EelFigure):

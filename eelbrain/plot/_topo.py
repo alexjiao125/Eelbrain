@@ -613,9 +613,9 @@ class _TopoWindow:
         if self.plot:
             self.plot.set_cmap(cmap, meas)
 
-    def set_vlim(self, vmin, vmax, meas):
+    def set_vlim(self, v, vmax=None, meas=None):
         if self.plot:
-            self.plot.set_vlim(vmin, vmax, meas)
+            self.plot.set_vlim(v, vmax, meas)
 
 
 class TopoArray(ColorMapMixin, EelFigure):

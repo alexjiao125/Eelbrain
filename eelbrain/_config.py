@@ -1,6 +1,7 @@
 # Author: Christian Brodbeck <christianbrodbeck@nyu.edu>
 """Configure Eelbrain"""
 from multiprocessing import cpu_count
+import os
 
 from ._colorspaces import to_rgb
 
@@ -68,9 +69,9 @@ def configure(
         ``prompt_toolkit=False``.
     animate : bool
         Animate plot navigation (default True).
-    nice : int [0, 19]
+    nice : int [-20, 19]
         Scheduling priority for muliprocessing (larger number yields more to
-        other processes).
+        other processes; negative numbers require root privileges).
     tqdm : bool
         Enable or disable :mod:`tqdm` progress bars.
     """
@@ -111,8 +112,10 @@ def configure(
         new['animate'] = bool(animate)
     if nice is not None:
         nice = int(nice)
-        if not 0 <= nice < 20:
-            raise ValueError("nice=%i; needs to be in range [0, 19]" % (nice,))
+        if not -20 <= nice < 20:
+            raise ValueError("nice=%i; needs to be in range [-20, 19]" % (nice,))
+        elif nice < 0 and not os.getuid() == 0:
+            raise ValueError("nice=%i; values < 0 require root privileges" % (nice,))
         new['nice'] = nice
     if tqdm is not None:
         new['tqdm'] = not tqdm

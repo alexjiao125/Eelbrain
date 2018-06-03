@@ -138,6 +138,8 @@ def update_subjects_dir(obj, subjects_dir, depth=0):
     if isinstance(obj, NDVar):
         if hasattr(obj, 'source'):
             obj.source.subjects_dir = subjects_dir
+        for v in obj.info.values():
+            update_subjects_dir(v, subjects_dir, depth)
     elif depth:
         if hasattr(obj, '__dict__'):
             values = obj.__dict__.values()

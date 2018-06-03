@@ -206,15 +206,14 @@ def _guess_ndvar_data_type(info):
     data : str
         Kind of data to extract
     """
-    for ch in info['chs']:
-        kind = ch['kind']
-        if kind == FIFF.FIFFV_MEG_CH:
-            if ch['unit'] == FIFF.FIFF_UNIT_T_M:
-                return 'grad'
-            elif ch['unit'] == FIFF.FIFF_UNIT_T:
-                return 'mag'
-        elif kind == FIFF.FIFFV_EEG_CH:
-            return 'eeg'
+    chs = info['chs']
+    if any(ch['kind'] == FIFF.FIFFV_MEG_CH for ch in chs):
+        if any(ch['unit'] == FIFF.FIFF_UNIT_T for ch in chs):
+            return 'mag'
+        elif any(ch['unit'] == FIFF.FIFF_UNIT_T_M for ch in chs):
+            return 'grad'
+    elif any(ch['kind'] == FIFF.FIFFV_EEG_CH for ch in chs):
+        return 'eeg'
     raise ValueError("No MEG or EEG channel found in info.")
 
 
@@ -237,8 +236,7 @@ def _picks(info, data, exclude):
         eog = False
     else:
         raise ValueError("data=%r (needs to be 'eeg', 'grad' or 'mag')" % data)
-    return mne.pick_types(info, meg, eeg, False, eog, ref_meg=False,
-                          exclude=exclude)
+    return mne.pick_types(info, meg, eeg, False, eog, ref_meg=False, exclude=exclude)
 
 
 def _ndvar_epochs_reject(data, reject):
@@ -254,8 +252,8 @@ def _ndvar_epochs_reject(data, reject):
 
 
 def epochs(ds, tmin=-0.1, tmax=None, baseline=None, decim=1, mult=1, proj=False,
-           data='mag', reject=None, exclude='bads', info=None, name=None,
-           raw=None, sensors=None, i_start='i_start', tstop=None):
+           data=None, reject=None, exclude='bads', info=None, name=None,
+           raw=None, sensors=None, i_start='i_start', tstop=None, sysname=None):
     """
     Load epochs as :class:`NDVar`.
 
@@ -268,10 +266,10 @@ def epochs(ds, tmin=-0.1, tmax=None, baseline=None, decim=1, mult=1, proj=False,
     tmax : scalar
         Last sample to include in the epochs in seconds (Default 0.6; use
         ``tstop`` instead to specify index exclusive of last sample).
-    baseline : tuple(tmin, tmax) | ``None``
-        Time interval for baseline correction. Tmin/tmax in seconds, or None to
-        use all the data (e.g., ``(None, 0)`` uses all the data from the
-        beginning of the epoch up to t=0). ``baseline=None`` for no baseline
+    baseline : (tmin, tmax)
+        Time interval for baseline correction. ``tmin`` and ``tmax`` in seconds,
+        or None to use all the data (e.g., ``(None, 0)`` uses all the data from
+        the beginning of the epoch up to t=0). ``baseline=None`` for no baseline
         correction (default).
     decim : int
         Downsample the data by this factor when importing. ``1`` means no
@@ -283,7 +281,7 @@ def epochs(ds, tmin=-0.1, tmax=None, baseline=None, decim=1, mult=1, proj=False,
     proj : bool
         mne.Epochs kwarg (subtract projections when loading data)
     data : 'eeg' | 'mag' | 'grad'
-        The kind of data to load.
+        Which data channels data to include (default based on channels in data).
     reject : None | scalar
         Threshold for rejecting epochs (peak to peak). Requires a for of
         mne-python which implements the Epochs.model['index'] variable.
@@ -310,6 +308,10 @@ def epochs(ds, tmin=-0.1, tmax=None, baseline=None, decim=1, mult=1, proj=False,
         For example, at 100 Hz the epoch with ``tmin=-0.1, tmax=0.4`` will have 
         51 samples, while the epoch specified with ``tmin=-0.1, tstop=0.4`` will
         have 50 samples.
+    sysname : str
+        Name of the sensor system to load sensor connectivity (e.g. 'neuromag',
+        inferred automatically for KIT data converted with a recent version of
+        MNE-Python).
 
     Returns
     -------
@@ -319,13 +321,15 @@ def epochs(ds, tmin=-0.1, tmax=None, baseline=None, decim=1, mult=1, proj=False,
     if raw is None:
         raw = ds.info['raw']
 
+    if data is None:
+        data = _guess_ndvar_data_type(raw.info)
     picks = _picks(raw.info, data, exclude)
     reject = _ndvar_epochs_reject(data, reject)
 
     epochs_ = mne_epochs(ds, tmin, tmax, baseline, i_start, raw, decim=decim,
                          picks=picks, reject=reject, proj=proj, tstop=tstop)
     ndvar = epochs_ndvar(epochs_, name, data, mult=mult, info=info,
-                         sensors=sensors)
+                         sensors=sensors, sysname=sysname)
 
     if len(epochs_) == 0:
         raise RuntimeError("No events left in %r" % _get_raw_filename(raw))
@@ -333,7 +337,7 @@ def epochs(ds, tmin=-0.1, tmax=None, baseline=None, decim=1, mult=1, proj=False,
 
 
 def add_epochs(ds, tmin=-0.1, tmax=0.6, baseline=None, decim=1, mult=1,
-               proj=False, data='mag', reject=None, exclude='bads', info=None,
+               proj=False, data=None, reject=None, exclude='bads', info=None,
                name="meg", raw=None, sensors=None, i_start='i_start',
                sysname=None, tstop=None):
     """
@@ -368,7 +372,7 @@ def add_epochs(ds, tmin=-0.1, tmax=0.6, baseline=None, decim=1, mult=1,
     proj : bool
         mne.Epochs kwarg (subtract projections when loading data)
     data : 'eeg' | 'mag' | 'grad'
-        The kind of data to load.
+        Which data channels data to include (default based on channels in data).
     reject : None | scalar
         Threshold for rejecting epochs (peak to peak). Requires a for of
         mne-python which implements the Epochs.model['index'] variable.
@@ -409,6 +413,8 @@ def add_epochs(ds, tmin=-0.1, tmax=0.6, baseline=None, decim=1, mult=1,
     if raw is None:
         raw = ds.info['raw']
 
+    if data is None:
+        data = _guess_ndvar_data_type(raw.info)
     picks = _picks(raw.info, data, exclude)
     reject = _ndvar_epochs_reject(data, reject)
 
@@ -640,9 +646,9 @@ def sensor_dim(info, picks=None, sysname=None):
     return Sensor(ch_locs, ch_names, sysname, connectivity=conn)
 
 
-def raw_ndvar(raw, i_start=None, i_stop=None, decim=1, inv=None, lambda2=1,
-              method='dSPM', pick_ori=None, src=None, subjects_dir=None,
-              parc='aparc', label=None):
+def raw_ndvar(raw, i_start=None, i_stop=None, decim=1, data=None, exclude='bads',
+              inv=None, lambda2=1, method='dSPM', pick_ori=None, src=None,
+              subjects_dir=None, parc='aparc', label=None):
     """Raw dta as NDVar
 
     Parameters
@@ -657,10 +663,16 @@ def raw_ndvar(raw, i_start=None, i_stop=None, decim=1, inv=None, lambda2=1,
         Downsample the data by this factor when importing. ``1`` (default)
         means no downsampling. Note that this function does not low-pass filter
         the data. The data is downsampled by picking out every n-th sample.
+    data : 'eeg' | 'mag' | 'grad' | None
+        The kind of data to include (default based on data).
+    exclude : list of string | str
+        Channels to exclude (:func:`mne.pick_types` kwarg).
+        If 'bads' (default), exclude channels in info['bads'].
+        If empty do not exclude any.
     inv : InverseOperator
         MNE inverse operator to transform data to source space (by default, data
         are loaded in sensor space). If ``inv`` is specified, subsequent
-        parameters are required to construct the right soure space.
+        parameters are required to construct the right source space.
     lambda2 : scalar
         Inverse solution parameter: lambda squared parameter.
     method : str
@@ -697,7 +709,7 @@ def raw_ndvar(raw, i_start=None, i_stop=None, decim=1, inv=None, lambda2=1,
         if not start_scalar and stop_scalar:
             raise TypeError(
                 "i_start and i_stop must either both be scalar or both "
-                "iterable, got i_start=%r, i_stop=%s" %  (i_start, i_stop))
+                "iterable, got i_start=%r, i_stop=%s" % (i_start, i_stop))
         i_start = (i_start,)
         i_stop = (i_stop,)
         scalar = True
@@ -710,9 +722,12 @@ def raw_ndvar(raw, i_start=None, i_stop=None, decim=1, inv=None, lambda2=1,
 
     # target dimension
     if inv is None:
-        picks = mne.pick_types(raw.info, ref_meg=False)
+        if data is None:
+            data = _guess_ndvar_data_type(raw.info)
+        picks = _picks(raw.info, data, exclude)
         dim = sensor_dim(raw, picks)
     else:
+        assert data is None
         dim = SourceSpace.from_mne_source_spaces(inv['src'], src, subjects_dir,
                                                  parc, label)
         inv = prepare_inverse_operator(inv, 1, lambda2, method)
@@ -747,8 +762,8 @@ def epochs_ndvar(epochs, name=None, data=None, exclude='bads', mult=1,
         The epochs object or path to an epochs FIFF file.
     name : None | str
         Name for the NDVar.
-    data : 'eeg' | 'mag' | 'grad' | None
-        The kind of data to include. If None (default) based on ``epochs.info``.
+    data : 'eeg' | 'mag' | 'grad'
+        Which data channels data to include (default based on channels in data).
     exclude : list of string | str
         Channels to exclude (:func:`mne.pick_types` kwarg).
         If 'bads' (default), exclude channels in info['bads'].
@@ -773,7 +788,7 @@ def epochs_ndvar(epochs, name=None, data=None, exclude='bads', mult=1,
 
     if data is None:
         data = _guess_ndvar_data_type(epochs.info)
-
+    picks = _picks(epochs.info, data, exclude)
     if data == 'eeg' or data == 'eeg&eog':
         info_ = _cs.eeg_info(vmax, mult)
         summary_vmax = 0.1 * vmax if vmax else None
@@ -794,7 +809,6 @@ def epochs_ndvar(epochs, name=None, data=None, exclude='bads', mult=1,
         info_.update(info)
 
     x = epochs.get_data()
-    picks = _picks(epochs.info, data, exclude)
     if len(picks) < x.shape[1]:
         x = x[:, picks]
 
@@ -818,8 +832,8 @@ def evoked_ndvar(evoked, name=None, data=None, exclude='bads', vmax=None,
         path to a evoked fiff file containing only one evoked.
     name : str
         Name of the NDVar.
-    data : 'eeg' | 'mag' | 'grad' | None
-        The kind of data to include. If None (default) based on ``epochs.info``.
+    data : 'eeg' | 'mag' | 'grad'
+        Which data channels data to include (default based on channels in data).
     exclude : list of string | string
         Channels to exclude (:func:`mne.pick_types` kwarg).
         If 'bads' (default), exclude channels in info['bads'].

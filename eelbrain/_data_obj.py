@@ -71,8 +71,9 @@ from ._utils import (
     deprecated_attribute, intervals, ui, LazyProperty, n_decimals,
     natsorted)
 from ._utils.numpy_utils import (
-    apply_numpy_index, digitize_index, digitize_slice_endpoint, FULL_AXIS_SLICE,
-    FULL_SLICE, index_length, index_to_int_array, slice_to_arange)
+    INT_TYPES, FULL_SLICE, FULL_AXIS_SLICE,
+    apply_numpy_index, digitize_index, digitize_slice_endpoint,
+    index_length, index_to_int_array, slice_to_arange)
 from .mne_fixes import MNE_EPOCHS, MNE_EVOKED, MNE_RAW, MNE_LABEL
 from functools import reduce
 
@@ -91,7 +92,7 @@ preferences = dict(fullrepr=False,  # whether to display full arrays/dicts in __
 
 
 UNNAMED = '<?>'
-LIST_INDEX_TYPES = (int, slice)
+LIST_INDEX_TYPES = (*INT_TYPES, slice)
 _pickled_ds_wildcard = ("Pickled Dataset (*.pickled)", '*.pickled')
 _tex_wildcard = ("TeX (*.tex)", '*.tex')
 _tsv_wildcard = ("Plain Text Tab Separated Values (*.txt)", '*.txt')
@@ -1461,6 +1462,9 @@ class Var(object):
         info = self.info.copy()
         info['longname'] = longname(self) + ' ** ' + longname(other)
         return Var(x, info=info)
+
+    def __round__(self, n=0):
+        return Var(np.round(self.x, n), self.name)
 
     def _coefficient_names(self, method):
         return longname(self),
@@ -3057,6 +3061,9 @@ class NDVar(object):
     def __rpow__(self, other):
         return NDVar(other ** self.x, self.dims, self.info.copy(), self.name)
 
+    def __round__(self, n=0):
+        return NDVar(np.round(self.x, n), self.dims, self.info.copy(), self.name)
+
     def __sub__(self, other):
         dims, x_self, x_other = self._align(other)
         return NDVar(x_self - x_other, dims, self.info.copy(), self.name)
@@ -4438,11 +4445,14 @@ class NDVar(object):
         Indexes for dimensions can be either specified as arguments in the
         order of the data axes, or with dimension names as keywords; for::
 
+        >>> x = datasets.get_uts(True)['utsnd']
         >>> x
-        >>> <NDVar 'uts': 60 (case) X 100 (time)>
+        <NDVar 'utsnd': 60 case, 5 sensor, 100 time>
+        >>> x.sub(time=0.1)
+        <NDVar 'utsnd': 60 case, 5 sensor>
 
-        ``x.sub(time=0.1)`` is equivalent to ``x.sub(slice(None), 0.1)`` and
-        ``x[:, 0.1]``.
+        ``x.sub(time=0.1)`` is equivalent to ``x.sub((), (), 0.1)`` and
+        ``x[:, :, 0.1]``.
 
         Tuples are reserved for slicing and are treated like ``slice`` objects.
         Use lists for indexing arbitrary sequences of elements.
@@ -7008,7 +7018,7 @@ class Dimension(object):
         else:
             return arg.x
 
-    def _array_index_for_slice(self, start, stop=None, step=None):
+    def _array_index_for_slice(self, start=None, stop=None, step=None):
         if step is not None and not isinstance(step, Integral):
             raise TypeError("Slice index step for %s must be int, not %r" %
                             (self._dimname(), step))
@@ -7227,6 +7237,8 @@ class Case(Dimension):
             return arg.x
         elif isinstance(arg, np.ndarray) and arg.dtype.kind in 'bi':
             return arg
+        elif isinstance(arg, tuple):
+            return slice(*arg) if arg else FULL_SLICE
         else:
             raise TypeError("Unknown index type for case dimension: %r" %
                             (arg,))

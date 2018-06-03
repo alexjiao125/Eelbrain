@@ -27,7 +27,7 @@ from .._info import BAD_CHANNELS
 from .._names import INTERPOLATE_CHANNELS
 from .._ndvar import neighbor_correlation
 from .._utils.parse import FLOAT_PATTERN, POS_FLOAT_PATTERN, INT_PATTERN
-from .._utils.numpy_utils import FULL_SLICE
+from .._utils.numpy_utils import FULL_SLICE, INT_TYPES
 from .._wxutils import Icon, ID, REValidator
 from ..mne_fixes import MNE_EPOCHS
 from ..plot._base import find_axis_params_data, find_fig_vlims, find_fig_cmaps
@@ -768,7 +768,7 @@ class Frame(FileFrame):
 
     def CaseChanged(self, index):
         "Update the states of the segments on the current page"
-        if isinstance(index, int):
+        if isinstance(index, INT_TYPES):
             index = [index]
         elif isinstance(index, slice):
             start = index.start or 0

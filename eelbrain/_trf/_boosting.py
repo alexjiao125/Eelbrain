@@ -11,7 +11,7 @@ x2 = ds['x2']
 %prun -s cumulative res = boosting(y, x1, 0, 1)
 
 """
-from inspect import getargspec
+import inspect
 from itertools import product
 from math import floor
 from multiprocessing import Process, Queue
@@ -28,6 +28,7 @@ from tqdm import tqdm
 from .._config import CONFIG
 from .._data_obj import NDVar
 from .._utils import LazyProperty
+from .._utils.system import caffeine
 from ._boosting_opt import l1, l2, generate_options, update_error
 from .shared import RevCorrData
 
@@ -114,8 +115,9 @@ class BoostingResult(object):
         self._experimental_parameters = experimental_parameters
 
     def __getstate__(self):
-        state = {attr: getattr(self, attr) for attr in
-                 getargspec(self.__init__).args[1:]}
+        state = {attr: getattr(self, attr) for attr, param in
+                 inspect.signature(self.__class__).parameters.items()
+                 if param.kind is not inspect.Parameter.VAR_KEYWORD}
         state.update(self._experimental_parameters)
         return state
 
@@ -129,11 +131,11 @@ class BoostingResult(object):
             x = ' + '.join(map(str, self.x))
         items = ['boosting %s ~ %s' % (self.y, x),
                  '%g - %g' % (self.tstart, self.tstop)]
-        argspec = getargspec(boosting)
-        names = argspec.args[-len(argspec.defaults):]
-        for name, default in zip(names, argspec.defaults):
+        for name, param in inspect.signature(boosting).parameters.items():
+            if param.default is inspect.Signature.empty:
+                continue
             value = getattr(self, name)
-            if value != default:
+            if value != param.default:
                 items.append('%s=%r' % (name, value))
         return '<%s>' % ', '.join(items)
 
@@ -172,6 +174,7 @@ class BoostingResult(object):
             setattr(self, attr, sub_func(getattr(self, attr)))
 
 
+@caffeine
 def boosting(y, x, tstart, tstop, scale_data=True, delta=0.005, mindelta=None,
              error='l2'):
     """Estimate a temporal response function through boosting
@@ -255,7 +258,6 @@ def boosting(y, x, tstart, tstop, scale_data=True, delta=0.005, mindelta=None,
             y_data, x_data, trf_length, delta, mindelta_, N_SEGS, error)
         stop_jobs = Event()
         thread = Thread(target=put_jobs, args=(job_queue, n_y, N_SEGS, stop_jobs))
-        thread.daemon = True
         thread.start()
 
         # collect results
@@ -516,7 +518,6 @@ def setup_workers(y, x, trf_length, delta, mindelta, nsegs, error):
             mindelta, nsegs, error, job_queue, result_queue)
     for _ in range(CONFIG['n_workers']):
         process = Process(target=boosting_worker, args=args)
-        process.daemon = True
         process.start()
 
     return job_queue, result_queue

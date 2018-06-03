@@ -153,9 +153,9 @@ def frequencies(y, x=None, of=None, sub=None, ds=None):
                 out[f.name] = Factor((c[i] for c in x.cells),
                                      random=getattr(f, 'random', False))
         elif isinstance(y, Factor):
-            out[y.name] = Factor(cells, random=y.random)
+            out[y.name or 'y'] = Factor(cells, random=y.random)
         elif isinstance(y, Var):
-            out[y.name] = Var(cells)
+            out[y.name or 'y'] = Var(cells)
         else:
             raise RuntimeError("y=%r" % (y,))
         n = np.fromiter((np.sum(y == cell) for cell in cells), int, len(cells))

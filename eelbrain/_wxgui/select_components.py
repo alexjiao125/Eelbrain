@@ -8,6 +8,7 @@
 #  - visualizaes Document
 #  - listens to Document changes
 #  - issues commands to Model
+from distutils.version import LooseVersion
 from itertools import repeat
 from math import ceil
 import re
@@ -85,6 +86,9 @@ class Document(FileDocument):
         self.saved = True
 
         self.ica = ica = mne.preprocessing.read_ica(path)
+        if LooseVersion(mne.__version__) < LooseVersion('0.16'):
+            ica.pre_whitener_ = ica._pre_whitener
+
         self.accept = np.ones(self.ica.n_components_, bool)
         self.accept[ica.exclude] = False
         self.epochs = epochs = ds['epochs']
@@ -112,9 +116,9 @@ class Document(FileDocument):
 
         # global mean (which is not modified by ICA)
         if ica.noise_cov is None:  # revert standardization
-            global_mean = ica.pca_mean_ * ica._pre_whitener[:, 0]
+            global_mean = ica.pca_mean_ * ica.pre_whitener_[:, 0]
         else:
-            global_mean = np.dot(linalg.pinv(ica._pre_whitener), ica.pca_mean_)
+            global_mean = np.dot(linalg.pinv(ica.pre_whitener_), ica.pca_mean_)
         self.global_mean = NDVar(global_mean, (self.epochs_ndvar.sensor,))
 
         # publisher

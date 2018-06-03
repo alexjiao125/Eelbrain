@@ -6,6 +6,7 @@ import numpy as np
 
 FULL_SLICE = slice(None)
 FULL_AXIS_SLICE = (FULL_SLICE,)
+INT_TYPES = (int, np.integer)
 
 
 def digitize_index(index, values, tol=None):

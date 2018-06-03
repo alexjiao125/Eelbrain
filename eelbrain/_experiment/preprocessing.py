@@ -205,10 +205,30 @@ class RawFilterElliptic(CachedRawPipe):
     def _sos(self, sfreq):
         nyq = sfreq / 2.
         low_stop, low_pass, high_pass, high_stop, gpass, gstop = self.args
-        order, wn = signal.ellipord((low_pass / nyq, high_pass / nyq),
-                                    (low_stop / nyq, high_stop / nyq),
-                                    gpass, gstop)
-        return signal.ellip(order, gpass, gstop, wn, 'bandpass', output='sos')
+        if high_stop is None:
+            assert low_stop is not None
+            assert high_pass is None
+        else:
+            high_stop /= nyq
+            high_pass /= nyq
+
+        if low_stop is None:
+            assert low_pass is None
+        else:
+            low_pass /= nyq
+            low_stop /= nyq
+
+        if low_stop is None:
+            btype = 'lowpass'
+            wp, ws = high_pass, high_stop
+        elif high_stop is None:
+            btype = 'highpass'
+            wp, ws = low_pass, low_stop
+        else:
+            btype = 'bandpass'
+            wp, ws = (low_pass, high_pass), (low_stop, high_stop)
+        order, wn = signal.ellipord(wp, ws, gpass, gstop)
+        return signal.ellip(order, gpass, gstop, wn, btype, output='sos')
 
     def filter_ndvar(self, ndvar):
         axis = ndvar.get_axis('time')
@@ -220,14 +240,17 @@ class RawFilterElliptic(CachedRawPipe):
         raw = self.source.load(subject, session, preload=True)
         self.log.debug("Raw %s: filtering for %s/%s...", self.name, subject,
                        session)
+        # filter data
         picks = mne.pick_types(raw.info, eeg=True, ref_meg=True)
         sos = self._sos(raw.info['sfreq'])
         for i in picks:
             raw._data[i] = signal.sosfilt(sos, raw._data[i])
-        if raw.info['lowpass'] and raw.info['lowpass'] > self.args[2]:
-            raw.info['lowpass'] = float(self.args[2])
-        if raw.info['highpass'] < self.args[1]:
-            raw.info['highpass'] = float(self.args[2])
+        # update info
+        low, high = self.args[1], self.args[2]
+        if high and raw.info['lowpass'] > high:
+            raw.info['lowpass'] = float(high)
+        if low and raw.info['highpass'] < low:
+            raw.info['highpass'] = float(low)
         return raw
 
 
