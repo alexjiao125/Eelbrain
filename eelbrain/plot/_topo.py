@@ -4,6 +4,7 @@
 from collections import Sequence
 from itertools import repeat
 from math import floor, sqrt
+from typing import Union, Tuple
 from warnings import warn
 
 import matplotlib as mpl
@@ -11,6 +12,7 @@ import numpy as np
 from scipy import interpolate, linalg
 from scipy.spatial import ConvexHull
 
+from .._data_obj import NDVar
 from . import _base
 from ._base import (
     EelFigure, PlotData, Layout, ImLayout, VariableAspectLayout,
@@ -26,7 +28,7 @@ class Topomap(SensorMapMixin, ColorMapMixin, TopoMapKey, EelFigure):
     ----------
     y : (list of) NDVar, dims = ([case,] sensor,)
         Data to plot.
-    Xax : None | categorial
+    xax : None | categorial
         Create a separate plot for each cell in this model.
     proj : str | list of str
         The sensor projection to use for topomaps (or one projection per plot).
@@ -37,9 +39,9 @@ class Topomap(SensorMapMixin, ColorMapMixin, TopoMapKey, EelFigure):
         is set to -vmax.
     contours : sequence | dict
         Number of contours to draw.
-    clip : bool | 'even' | 'circular'
+    clip : bool | 'even' | 'circle'
         Outline for clipping topomaps: 'even' to clip at a constant distance
-        (default), 'circular' to clip using a circle.
+        (default), 'circle' to clip using a circle.
     clip_distance : scalar
         How far from sensor locations to clip (1 is the axes height/width).
     head_radius : scalar | tuple
@@ -56,22 +58,25 @@ class Topomap(SensorMapMixin, ColorMapMixin, TopoMapKey, EelFigure):
         Show sensor labels. For 'name', any prefix common to all names
         is removed; with 'fullname', the full name is shown.
     ds : None | Dataset
-        If a Dataset is provided, ``epochs`` and ``Xax`` can be specified
+        If a Dataset is provided, ``epochs`` and ``xax`` can be specified
         as strings.
     sub : str | array
         Specify a subset of the data.
     res : int
         Resolution of the topomaps (width = height = ``res``).
-    interpolation : str
-        Matplotlib imshow() parameter for topomaps.
     axtitle : bool | sequence of str
         Title for the individual axes. The default is to show the names of the
         epochs, but only if multiple axes are plotted.
     xlabel : str
         Label below the topomaps (default is no label).
-    method : 'nearest' | 'linear' | 'cubic' | 'spline'
-        Alternative method for interpolating topo-map between sensors (default
-        is based on mne-python).
+    interpolation : 'nearest' | 'linear' | 'spline'
+        Method for interpolating topo-map between sensors (default is based on
+        mne-python).
+    im_interpolation : str
+        Topomap image interpolation (see Matplotlib's
+        :meth:`~matplotlib.axes.Axes.imshow`). Matplotlib 1.5.3's SVG output
+        can't handle uneven aspect with ``interpolation='none'``, use
+        ``interpolation='nearest'`` instead.
     title : None | string
         Figure title.
 
@@ -87,8 +92,8 @@ class Topomap(SensorMapMixin, ColorMapMixin, TopoMapKey, EelFigure):
     def __init__(self, y, xax=None, proj='default', cmap=None, vmax=None,
                  vmin=None, contours=7, clip='even', clip_distance=0.05,
                  head_radius=None, head_pos=0., mark=None, sensorlabels='none',
-                 ds=None, sub=None, res=64, interpolation=None, axtitle=True,
-                 xlabel=None, method=None, *args, **kwargs):
+                 ds=None, sub=None, res=None, axtitle=True, xlabel=None,
+                 interpolation=None, im_interpolation=None, *args, **kwargs):
         data = PlotData.from_args(y, ('sensor',), xax, ds, sub)
         self.plots = []
         ColorMapMixin.__init__(self, data.data, cmap, vmax, vmin, contours,
@@ -100,9 +105,6 @@ class Topomap(SensorMapMixin, ColorMapMixin, TopoMapKey, EelFigure):
         elif len(proj) != data.n_plots:
             raise ValueError("need as many proj as axes (%s)" % data.n_plots)
 
-        if interpolation is None:
-            interpolation = 'nearest' if method else 'bilinear'
-
         layout = ImLayout(data.plot_used, 1, 5, None, {}, *args, **kwargs)
         EelFigure.__init__(self, data.frame_title, layout)
         self._set_axtitle(axtitle, data)
@@ -110,8 +112,8 @@ class Topomap(SensorMapMixin, ColorMapMixin, TopoMapKey, EelFigure):
         # plots
         for ax, layers, proj_ in zip(self._axes, data.data, proj):
             h = _ax_topomap(ax, layers, clip, clip_distance, sensorlabels, mark,
-                            None, None, proj_, res, interpolation, xlabel,
-                            self._vlims, self._cmaps, self._contours, method,
+                            None, None, proj_, res, im_interpolation, xlabel,
+                            self._vlims, self._cmaps, self._contours, interpolation,
                             head_radius, head_pos)
             self.plots.append(h)
 
@@ -133,10 +135,10 @@ class Topomap(SensorMapMixin, ColorMapMixin, TopoMapKey, EelFigure):
 class TopomapBins(EelFigure):
     _name = "TopomapBins"
 
-    def __init__(self, y, Xax=None, bin_length=0.05, tstart=None,
+    def __init__(self, y, xax=None, bin_length=0.05, tstart=None,
                  tstop=None, ds=None, sub=None, vmax=None, vmin=None, *args,
                  **kwargs):
-        data = PlotData.from_args(y, ('sensor', 'time'), Xax, ds, sub)
+        data = PlotData.from_args(y, ('sensor', 'time'), xax, ds, sub)
         data._cannot_skip_axes(self)
         ax_data = [[l.bin(bin_length, tstart, tstop) for l in layers]
                    for layers in data.data]
@@ -170,26 +172,29 @@ class TopoButterfly(ColorMapMixin, TimeSlicerEF, TopoMapKey, YLimMixin,
     ----------
     y : (list of) NDVar
         Data to plot.
-    Xax : None | categorial
+    xax : None | categorial
         Create a separate plot for each cell in this model.
     xlabel, ylabel : bool | string
         Labels for x and y axes. If True, labels are automatically chosen.
     xticklabels : bool | int | list of int
         Add tick-labels to the x-axis. Specify which axes should carry
         x-axis tick labels using ``int`` axes indices (default ``-1``).
-    proj : str
-        The sensor projection to use for topomaps.
-    res : int
-        Resolution of the topomaps (width = height = ``res``).
-    interpolation : str
-        Array image interpolation (see Matplotlib's
-        :meth:`~matplotlib.axes.Axes.imshow`). Matplotlib 1.5.3's SVG output
-        can't handle uneven aspect with ``interpolation='none'``, use
-        ``interpolation='nearest'`` instead.
     color : matplotlib color
         Color of the butterfly plots.
     linewidth : scalar
         Linewidth for plots (defult is to use ``matplotlib.rcParams``).
+    proj : str
+        The sensor projection to use for topomaps.
+    res : int
+        Resolution of the topomaps (width = height = ``res``).
+    interpolation : 'nearest' | 'linear' | 'spline'
+        Method for interpolating topo-map between sensors (default is based on
+        mne-python).
+    clip : bool | 'even' | 'circle'
+        Outline for clipping topomaps: 'even' to clip at a constant distance
+        (default), 'circle' to clip using a circle.
+    clip_distance : scalar
+        How far from sensor locations to clip (1 is the axes height/width).
     sensorlabels : None | 'index' | 'name' | 'fullname'
         Show sensor labels. For 'name', any prefix common to all names
         is removed; with 'fullname', the full name is shown.
@@ -198,7 +203,7 @@ class TopoButterfly(ColorMapMixin, TimeSlicerEF, TopoMapKey, YLimMixin,
     mcolor : matplotlib color
         Color for marked sensors.
     ds : None | Dataset
-        If a Dataset is provided, ``epochs`` and ``Xax`` can be specified
+        If a Dataset is provided, ``epochs`` and ``xax`` can be specified
     sub : str | array
         Specify a subset of the data.
         as strings.
@@ -218,8 +223,14 @@ class TopoButterfly(ColorMapMixin, TimeSlicerEF, TopoMapKey, YLimMixin,
         epochs, but only if multiple axes are plotted.
     frame : 't'
         Use T-frame for the Butterfly plots (default is rectangular frame).
-    xlim : (scalar, scalar)
-        Initial x-axis view limits (default is the full x-axis in the data).
+    xlim : scalar | (scalar, scalar)
+        Initial x-axis view limits as ``(left, right)`` tuple or as ``length``
+        scalar (default is the full x-axis in the data).
+    im_interpolation : str
+        Topomap image interpolation (see Matplotlib's
+        :meth:`~matplotlib.axes.Axes.imshow`). Matplotlib 1.5.3's SVG output
+        can't handle uneven aspect with ``interpolation='none'``, use
+        ``interpolation='nearest'`` instead.
     title : None | string
         Figure title.
 
@@ -251,17 +262,18 @@ class TopoButterfly(ColorMapMixin, TimeSlicerEF, TopoMapKey, YLimMixin,
     _default_xlabel_ax = -2
     _name = "TopoButterfly"
 
-    def __init__(self, y, Xax=None, xlabel=True, ylabel=True,
-                 xticklabels=-1,
-                 proj='default', res=100, interpolation='nearest', color=None, linewidth=None,
+    def __init__(self, y, xax=None, xlabel=True, ylabel=True, xticklabels=-1,
+                 color=None, linewidth=None,
+                 proj='default', res=None, interpolation=None, clip='even',
+                 clip_distance=0.05,
                  sensorlabels=None, mark=None, mcolor=None, ds=None, sub=None,
                  vmax=None, vmin=None, cmap=None, axlabel=None, axtitle=True,
-                 frame=True, xlim=None, *args, **kwargs):
+                 frame=True, xlim=None, im_interpolation=None, *args, **kwargs):
         if axlabel is not None:
             warn("The axlabel parameter for plot.TopoButterfly() is "
                  "deprecated, please use axtitle instead", DeprecationWarning)
             axtitle = axlabel
-        data = PlotData.from_args(y, ('sensor', None), Xax, ds, sub)
+        data = PlotData.from_args(y, ('sensor', None), xax, ds, sub)
         data._cannot_skip_axes(self)
         xdim = data.dims[1]
         self._epochs = data.data
@@ -282,13 +294,18 @@ class TopoButterfly(ColorMapMixin, TimeSlicerEF, TopoMapKey, YLimMixin,
         ColorMapMixin.__init__(self, data.data, cmap, vmax, vmin, None,
                                self.topo_plots)
 
-        self._topo_kwargs = {'proj': proj,
-                             'contours': self._contours,
-                             'res': res,
-                             'interpolation': interpolation,
-                             'sensorlabels': sensorlabels,
-                             'mark': mark,
-                             'mcolor': mcolor}
+        self._topo_kwargs = {
+            'clip': clip,
+            'clip_distance': clip_distance,
+            'proj': proj,
+            'contours': self._contours,
+            'res': res,
+            'interpolation': interpolation,
+            'im_interpolation': im_interpolation,
+            'sensorlabels': sensorlabels,
+            'mark': mark,
+            'mcolor': mcolor,
+        }
 
         # plot epochs (x/y are in figure coordinates)
         for ax, layers in zip(self.bfly_axes, data.plot_data):
@@ -323,7 +340,7 @@ class TopoButterfly(ColorMapMixin, TimeSlicerEF, TopoMapKey, YLimMixin,
 
         if not self.topo_plots:
             for ax, layers in zip(self.topo_axes, epochs):
-                p = _ax_topomap(ax, layers, False, cmaps=self._cmaps,
+                p = _ax_topomap(ax, layers, cmaps=self._cmaps,
                                 vlims=self._vlims, **self._topo_kwargs)
                 self.topo_plots.append(p)
         else:
@@ -381,27 +398,40 @@ class _plt_topomap(_plt_im):
         Empty space beyond outmost sensors in the im plot.
     vmax : scalar
         Override the colorspace vmax.
-    method : 'nearest' | 'linear' | 'cubic' | 'spline'
+    interpolation : 'nearest' | 'linear' | 'spline'
         Method for interpolating topo-map between sensors.
     """
     _aspect = 'equal'
 
-    def __init__(self, ax, ndvar, overlay, proj, res, interpolation, vlims,
-                 cmaps, contours, method, clip, clip_distance):
+    def __init__(
+            self,
+            ax: mpl.axes.Axes,
+            ndvar: NDVar,
+            overlay,
+            proj,
+            res,
+            im_interpolation,
+            vlims,
+            cmaps,
+            contours,
+            interpolation: str,
+            clip: str,
+            clip_distance: float,
+    ):
         # store attributes
         self._proj = proj
         self._visible_data = ndvar.sensor._visible_sensors(proj)
         self._grid = np.linspace(0, 1, res)
         self._mgrid = tuple(np.meshgrid(self._grid, self._grid))
-        self._method = method
+        self._method = interpolation
 
         # clip mask
-        if method is None and clip:
+        if interpolation is None and clip:
             locs = ndvar.sensor.get_locs_2d(self._proj, frame=SENSORMAP_FRAME)
-            hull = ConvexHull(locs)
-            points = locs[hull.vertices]
-            default_head_radius = sqrt(np.min(np.sum((points - [0.5, 0.5]) ** 2, 1)))
             if clip == 'even':
+                hull = ConvexHull(locs)
+                points = locs[hull.vertices]
+                default_head_radius = sqrt(np.min(np.sum((points - [0.5, 0.5]) ** 2, 1)))
                 # find offset due to clip_distance
                 tangents = np.roll(points, -1, axis=0) - np.roll(points, 1, axis=0)
                 verticals = np.dot(tangents, [[0, -1], [1, 0]])
@@ -410,17 +440,19 @@ class _plt_topomap(_plt_im):
                 # apply offset
                 points += verticals
                 mask = mpl.patches.Polygon(points, transform=ax.transData)
-            else:
+            elif clip == 'circle':
                 clip_radius = sqrt(np.max(np.sum((locs - [0.5, 0.5]) ** 2, 1)))
-                mask = mpl.patches.Circle((0.5, 0.5), clip_radius,
-                                          transform=ax.transData)
+                mask = mpl.patches.Circle((0.5, 0.5), clip_radius, transform=ax.transData)
+                default_head_radius = clip_radius
+            else:
+                raise ValueError('clip=%r' % (clip,))
         else:
             mask = None
             default_head_radius = None
 
         self._default_head_radius = default_head_radius
         _plt_im.__init__(self, ax, ndvar, overlay, cmaps, vlims, contours,
-                         (0, 1, 0, 1), interpolation, mask)
+                         (0, 1, 0, 1), im_interpolation, mask)
 
     def _data_from_ndvar(self, ndvar):
         v = ndvar.get_data(('sensor',))
@@ -490,18 +522,30 @@ class _ax_topomap(_ax_im_array):
 
     Parameters
     ----------
-    sensorlabels : None | 'index' | 'name' | 'fullname'
-        Show sensor labels. For 'name', any prefix common to all names
-        is removed; with 'fullname', the full name is shown.
     mark : list of IDs
         highlight a subset of the sensors
     """
-    def __init__(self, ax, layers, clip=False, clip_distance=0.05,
-                 sensorlabels=None, mark=None, mcolor=None, mmarker=None,
-                 proj='default',
-                 res=100, interpolation=None, xlabel=None, vlims={}, cmaps={},
-                 contours={}, method='linear', head_radius=None, head_pos=0.,
-                 head_linewidth=None):
+    def __init__(
+            self,
+            ax,
+            layers,
+            clip: str = 'even',  # even or circle (only applies if interpolation is None)
+            clip_distance: float=0.05,  # distance from outermost sensor for clip=='even'
+            sensorlabels: str = None,  # index | name | fullname
+            mark=None,
+            mcolor=None,
+            mmarker=None,
+            proj: str = 'default',  # topomap projection method
+            res: int = None,  # topomap image resolution
+            im_interpolation: str = None,  # matplotlib imshow interpolation method
+            xlabel: Union[bool, str] = None,
+            vlims: dict = {},
+            cmaps: dict = {},
+            contours: dict = {},
+            interpolation: str = None,  # topomap interpolation method
+            head_radius: float = None,
+            head_pos: Union[float, Tuple[float, float]] = 0.,  # y if centered on x, or (x, y)
+            head_linewidth: float = None):
         self.ax = ax
         self.data = layers
         self.proj = proj
@@ -509,18 +553,21 @@ class _ax_topomap(_ax_im_array):
 
         if xlabel is True:
             xlabel = layers[0].name
+        if im_interpolation is None:
+            im_interpolation = 'bilinear'
+        if res is None:
+            res = 64 if interpolation is None else 100
 
         ax.set_axis_off()
         overlay = False
         for layer in layers:
-            h = _plt_topomap(ax, layer, overlay, proj, res, interpolation,
-                             vlims, cmaps, contours, method, clip, clip_distance)
+            h = _plt_topomap(ax, layer, overlay, proj, res, im_interpolation,
+                             vlims, cmaps, contours, interpolation, clip, clip_distance)
             self.layers.append(h)
             overlay = True
 
         # head outline
-        if head_radius is None and method is None and \
-                        layer.sensor._topomap_outlines(proj) == 'top':
+        if head_radius is None and clip == 'circle' and interpolation is None and layer.sensor._topomap_outlines(proj) == 'top':
             head_radius = self.layers[0]._default_head_radius
 
         # plot sensors
@@ -589,8 +636,7 @@ class _TopoWindow:
 
             layers = [l.sub(time=t) for l in self.parent.data if t in l.time]
             if self.plot is None:
-                self.plot = _ax_topomap(self.ax, layers, False,
-                                        **self.plot_args)
+                self.plot = _ax_topomap(self.ax, layers, **self.plot_args)
             else:
                 self.plot.set_data(layers)
 
@@ -625,7 +671,7 @@ class TopoArray(ColorMapMixin, EelFigure):
     ----------
     y : (list of) NDVar
         Data to plot.
-    Xax : None | categorial
+    xax : None | categorial
         Create a separate plot for each cell in this model.
     title : None | string
         Figure title.
@@ -634,7 +680,7 @@ class TopoArray(ColorMapMixin, EelFigure):
     t : list of scalar (len <= ntopo)
         Time points for topomaps.
     ds : None | Dataset
-        If a Dataset is provided, ``epochs`` and ``Xax`` can be specified
+        If a Dataset is provided, ``epochs`` and ``xax`` can be specified
         as strings.
     sub : str | array
         Specify a subset of the data.
@@ -644,8 +690,11 @@ class TopoArray(ColorMapMixin, EelFigure):
         Lower limit for the colormap.
     cmap : str
         Colormap (default depends on the data).
-    interpolation : str
-        Array image interpolation (see Matplotlib's
+    interpolation : 'nearest' | 'linear' | 'spline'
+        Method for interpolating topo-map between sensors (default is based on
+        mne-python).
+    im_interpolation : str
+        Topomap image interpolation (see Matplotlib's
         :meth:`~matplotlib.axes.Axes.imshow`). Matplotlib 1.5.3's SVG output
         can't handle uneven aspect with ``interpolation='none'``, use
         ``interpolation='nearest'`` instead.
@@ -666,10 +715,11 @@ class TopoArray(ColorMapMixin, EelFigure):
     _make_axes = False
     _name = 'TopoArray'
 
-    def __init__(self, y, Xax=None, title=None, ntopo=3, t=[], ds=None,
+    def __init__(self, y, xax=None, title=None, ntopo=3, t=(), ds=None,
                  sub=None, vmax=None, vmin=None, cmap=None, interpolation=None,
-                 xticklabels=-1, axtitle=True, *args, **kwargs):
-        data = PlotData.from_args(y, ('time', 'sensor'), Xax, ds, sub)
+                 im_interpolation=None, xticklabels=-1, axtitle=True, *args,
+                 **kwargs):
+        data = PlotData.from_args(y, ('time', 'sensor'), xax, ds, sub)
         n_topo_total = ntopo * data.n_plots
 
         # create figure
@@ -707,7 +757,7 @@ class TopoArray(ColorMapMixin, EelFigure):
                                       picker=True)
             ax.ID = i
             ax.type = 'main'
-            im_plot = _ax_im_array(ax, layers, 'time', interpolation,
+            im_plot = _ax_im_array(ax, layers, 'time', im_interpolation,
                                    self._vlims, self._cmaps, self._contours)
             self._axes.append(ax)
             self._array_axes.append(ax)
@@ -724,7 +774,9 @@ class TopoArray(ColorMapMixin, EelFigure):
                 ax.ID = ID
                 ax.type = 'window'
                 win = _TopoWindow(ax, im_plot, vlims=self._vlims,
-                                  cmaps=self._cmaps, contours=self._contours)
+                                  cmaps=self._cmaps, contours=self._contours,
+                                  interpolation=interpolation,
+                                  im_interpolation=im_interpolation)
                 self._axes.append(ax)
                 self._topo_windows.append(win)
         all_plots.extend(self._array_plots)

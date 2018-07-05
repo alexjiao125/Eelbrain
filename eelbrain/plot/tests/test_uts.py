@@ -5,7 +5,11 @@ Created on Dec 2, 2012
 '''
 from nose.tools import eq_
 
-from eelbrain import Factor, datasets, plot, testnd
+from eelbrain import (
+    datasets, plot, testnd,
+    Factor,
+    concatenate, set_tmin,
+)
 
 
 def test_uts_stat():
@@ -20,7 +24,7 @@ def test_uts_stat():
     p.plot_legend('center')
     pl.close()
     p.close()
-    p = plot.UTSStat('uts', 'A', Xax='B', ds=ds, show=False)
+    p = plot.UTSStat('uts', 'A', xax='B', ds=ds, show=False)
     p.close()
     p = plot.UTSStat('uts', 'A%B', 'rm', sub="rm.isin(('R00', 'R01'))", ds=ds,
                      show=False)
@@ -61,6 +65,8 @@ def test_uts_stat():
 def test_uts():
     "test plot.UTS plotting function"
     ds = datasets.get_uts()
+    x_long = set_tmin(concatenate(ds[:10, 'uts']), -1)
+
     p = plot.UTS('uts', ds=ds, show=False)
     p.close()
     p = plot.UTS('uts', 'A%B', ds=ds, show=False)
@@ -69,6 +75,12 @@ def test_uts():
     eq_(p.get_ylim(), (0, 1))
     p.set_ylim(1, -1)
     eq_(p.get_ylim(), (1, -1))
+    p.close()
+
+    p = plot.UTS(x_long, h=2, w=5, xlim=2)
+    eq_(p.get_xlim(), (-1, 1))
+    p.set_xlim(2, 4)
+    eq_(p.get_xlim(), (2, 4))
     p.close()
 
 
@@ -95,5 +107,5 @@ def test_clusters():
     p = plot.UTSStat(Y, A % B, match=subject, show=False)
     p.set_clusters(res.clusters)
     p.close()
-    p = plot.UTSStat(Y, A, Xax=B, match=subject, show=False)
+    p = plot.UTSStat(Y, A, xax=B, match=subject, show=False)
     p.close()

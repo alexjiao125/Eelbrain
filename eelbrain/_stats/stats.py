@@ -205,8 +205,8 @@ def rmssd(y):
     N = len(y)
     assert N > 1
     dy = np.diff(y)
-    X = N / (N - 1) * np.sum(dy ** 2)
-    return np.sqrt(X)
+    x = N / (N - 1) * np.sum(dy ** 2)
+    return np.sqrt(x)
 
 
 class SEM(object):

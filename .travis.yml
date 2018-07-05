@@ -9,7 +9,7 @@ matrix:
     - os: osx  # https://github.com/travis-ci/travis-ci/issues/2312
       python: 3.6
       sudo: false
-      env: CONDA_OS="MacOSX"
+      env: CONDA_OS="MacOSX" KMP_DUPLICATE_LIB_OK=TRUE
     - os: linux
       python: 3.6
       sudo: false
@@ -27,7 +27,7 @@ before_install:
   - ./miniconda.sh -b -p $HOME/miniconda
   - export PATH=$HOME/miniconda/bin:$PATH
   - conda update --yes -n base conda
-  - conda env create -n condaenv --file env-dev3.yml
+  - conda env create -n condaenv --file env-dev.yml
   - . $HOME/miniconda/etc/profile.d/conda.sh
   - conda activate condaenv
   - python -c "import mne; mne.datasets.testing.data_path()"
@@ -38,7 +38,7 @@ install:
 
 script:
   - if [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-      make test_travis_osx;
+      make testw;
     else
       make test;
     fi;

@@ -81,7 +81,7 @@ from .._colorspaces import symmetric_cmaps, zerobased_cmaps, ALPHA_CMAPS
 from .._config import CONFIG
 from .._data_obj import (Case, UTS, ascategorial, asndvar, assub, isnumeric,
                          isdataobject, cellname)
-from .._utils import IS_WINDOWS, LazyProperty, intervals
+from .._utils import IS_WINDOWS, LazyProperty, intervals, ui
 from .._utils.subp import command_exists
 from ..fmtxt import Image
 from ..mne_fixes import MNE_EPOCHS
@@ -670,10 +670,11 @@ class PlotData(object):
             The dimensions needed for the plotting function. ``None`` to indicate
             arbitrary dimensions.
         xax : None | categorial
-            A model to divide Y into different axes. Xax is currently applied on
-            the first level, i.e., it assumes that Y's first dimension is cases.
+            A model to divide ``y`` into different axes. ``xax`` is currently
+            applied on the first level, i.e., it assumes that ``y``'s first
+            dimension is cases.
         ds : None | Dataset
-            Dataset containing data objects which are provided as str.
+            Dataset containing data objects which are provided as :class:`str`.
         sub : None | str
             Index selecting a subset of cases.
 
@@ -684,7 +685,7 @@ class PlotData(object):
 
          - simple NDVar: summary ``plot(meg)``
          - by dim: each case ``plot(meg, '.case')``
-         - NDVar and Xax argument: summary for each  ``plot(meg, subject)
+         - NDVar and xax argument: summary for each  ``plot(meg, subject)
          - nested list of layers (e.g., ttest results: [c1, c0, [c1-c0, p]])
         """
         if isinstance(y, cls):
@@ -2449,6 +2450,40 @@ class TimeSlicerEF(TimeSlicer):
         if self.__redraw and redraw:
             self.canvas.redraw(self.__axes)
 
+    def save_movie(self, filename=None, time_dilation=4., **kwargs):
+        """Save the figure with moving time axis as movie
+
+        Parameters
+        ----------
+        filename : str
+            Filename for the movie (omit to use a GUI).
+        time_dilation : float
+            Factor by which to stretch time (default 4). Time dilation is
+            controlled through the frame-rate; if the ``fps`` keyword argument
+            is specified, ``time_dilation`` is ignored.
+        **
+            :func:`imageio.mimwrite` parmeters.
+        """
+        import imageio
+
+        if filename is None:
+            filename = ui.ask_saveas("Save movie...", None, [('Movie (*.mov)', '*.mov')])
+            if not filename:
+                return
+        else:
+            filename = os.path.expanduser(filename)
+
+        if 'fps' not in kwargs:
+            kwargs['fps'] = 1. / self._time_dim.tstep / time_dilation
+
+        ims = []
+        for t in self._time_dim:
+            self._set_time(t, True)
+            # private attr usage is official: https://matplotlib.org/gallery/misc/agg_buffer_to_array.html
+            im = np.array(self.figure.canvas.renderer._renderer)
+            ims.append(im)
+        imageio.mimwrite(filename, ims, **kwargs)
+
 
 class TopoMapKey(object):
 
@@ -2485,8 +2520,9 @@ class XAxisMixin(object):
         Upper bound of the x axis.
     axes : list of Axes
         Axes that should be managed by the mixin.
-    xlim : tuple of 2 scalar
-        Initial x-axis display limits.
+    xlim : scalar | (scalar, scalar)
+        Initial x-axis view limits as ``(left, right)`` tuple or as ``length``
+        scalar (default is the full x-axis in the data).
 
     Notes
     -----
@@ -2513,6 +2549,8 @@ class XAxisMixin(object):
         self._register_key('end', self.__on_end)
         if xlim is None:
             xlim = (self.__xmin, self.__xmax)
+        elif np.isscalar(xlim):
+            xlim = (self.__xmin, self.__xmin + xlim)
         self._set_xlim(*xlim)
 
     def _init_with_data(self, epochs, xdim, xlim=None, axes=None, im=False):
@@ -2526,8 +2564,9 @@ class XAxisMixin(object):
             Dimension that is plotted on the x-axis.
         axes : list of Axes
             Axes that should be managed by the mixin.
-        xlim : tuple of 2 scalar
-            Initial x-axis display limits.
+        xlim : scalar | (scalar, scalar)
+            Initial x-axis view limits as ``(left, right)`` tuple or as ``length``
+            scalar (default is the full x-axis in the data).
         im : bool
             Plot displays an im, i.e. the axes limits need to extend beyond the
             dimension endpoints by half a step (default False).

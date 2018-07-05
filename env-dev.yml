@@ -1,29 +1,41 @@
-# usage: $ conda env create --file=env-dev.yml
-# need traitsui and pyface >5.1 for WXPython 4
+# Environment for macOS and Linux
+# usage: $ conda env create --file=env-dev3.yml
+# to run stats test, install r-ez with $ conda install -c ncil r-ez --no-deps
 name: eeldev
 channels:
 - defaults
 - conda-forge
 - christianbrodbeck
-- ncil  # for r-ez
+# - ncil  # for r-ez
 dependencies:
-# Standard requirements:
-- setuptools >= 17
+# mne-python
+- python >= 3.6
+- pip
+- mkl
+- numpy
+- scipy >= 0.17, !=1.0.0  # 1.0 has bug: UnboundLocalError: local variable 'iprint' referenced before assignment
+- matplotlib
+- pyqt >= 5.9
+- vtk >= 8
+- pandas
+- scikit-learn
+- h5py
+- pillow
+- statsmodels
+- joblib
+- psutil
+# Eelbrain additions
 - ipdb
 - ipython
-- tex >= 1.8
 - colormath >= 2.1
 - tqdm >= 4.19
 - keyring >= 5
-- pillow
+- pyarrow
 - wxpython >=4
-- numpy >= 1.11
-- scipy >= 0.17
 - nibabel >= 2.0
-- matplotlib >= 2.1
-- pysurfer >= 0.7
-- mne >= 0.15
+#- pysurfer >= 0.7
 # building
+- setuptools >= 17
 - cython
 # docs
 - sphinx
@@ -33,8 +45,21 @@ dependencies:
 - flake8
 - nose
 - pytest
-- coverage
+- pytest-cov
 # testing of R integration
 - rpy2
 - r-car
-- r-ez
+# - r-ez  # requires ncil channel
+# mayavi
+- traits >= 4.6.0
+- pyface >= 6  # need traitsui and pyface >5.1 for WXPython 4
+- traitsui >= 6
+- pip:
+  - mayavi
+  - "git+https://github.com/nipy/PySurfer.git"
+  - mne
+  - nitime
+  - nilearn
+  - neo
+#  - pytest-sugar  # errors on macOS
+  - pytest-faulthandler

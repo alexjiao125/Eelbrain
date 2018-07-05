@@ -16,18 +16,22 @@ Installing with Anaconda (recommended)
 --------------------------------------
 
 For using Eelbrain with Continuum Analytics' `Anaconda
-<https://store.continuum.io/cshop/anaconda/>`_, first make sure you install an
-Anaconda environment with Python 2.7 (due to a dependency on Mayavi), then
-add channels for Eelbrain and its dependencies to ``conda``::
+<https://www.anaconda.com/download/>`_, a `Conda environment
+<https://conda.io/docs/user-guide/tasks/manage-environments.html>`_ can be
+generated for Eelbrain with a single command::
+
+    $ conda create -n eelbrain -c defaults -c conda-forge -c christianbrodbeck eelbrain
+
+To add the required channels permanently::
 
     $ conda config --append channels conda-forge
     $ conda config --append channels christianbrodbeck
 
-Then install Eelbrain with its dependencies::
+To install Eelbrain with its dependencies in an existing environment::
 
     $ conda install eelbrain
 
-Later, update Eelbrain with::
+To update an existing Eelbrain installation::
 
     $ conda update eelbrain
 

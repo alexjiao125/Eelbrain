@@ -62,6 +62,8 @@ class BoostingResult(object):
         ``h`` scaled such that it applies to the original input ``y`` and ``x``.
         If boosting was done with ``scale_data=False``, ``h_scaled`` is the same
         as ``h``.
+    h_time : UTS
+        Time dimension of the kernel.
     r : float | NDVar
         Correlation between the measured response and the response predicted
         with ``h``. Type depends on the ``y`` parameter to :func:`boosting`.
@@ -148,6 +150,13 @@ class BoostingResult(object):
         else:
             return tuple(h * (self.y_scale / sx) for h, sx in
                          zip(self.h, self.x_scale))
+
+    @LazyProperty
+    def h_time(self):
+        if isinstance(self.h, NDVar):
+            return self.h.time
+        else:
+            return self.h[0].time
 
     def _set_parc(self, parc):
         """Change the parcellation of source-space result

@@ -70,6 +70,14 @@ class App(wx.App):
         return True
 
     def CreateMenu(self, t):
+        """Create Menubar
+
+        Parameters
+        ----------
+        t : App | EelbrainFrame
+            Object to which the menu will be attached; on macOS ``self``, on
+            other systems the specific :class:`EelbrainFrame`.
+        """
         menu_bar = wx.MenuBar()
 
         # File Menu
@@ -128,6 +136,7 @@ class App(wx.App):
         m = window_menu = wx.Menu()
         m.Append(ID.WINDOW_MINIMIZE, '&Minimize \tCtrl+M')
         m.Append(ID.WINDOW_ZOOM, '&Zoom')
+        m.Append(ID.SET_TITLE, '&Set Title')
         m.AppendSeparator()
         m.Append(ID.WINDOW_TILE, '&Tile')
         m.AppendSeparator()
@@ -166,6 +175,7 @@ class App(wx.App):
         t.Bind(wx.EVT_MENU, t.OnWindowIconize, id=ID.WINDOW_MINIMIZE)
         t.Bind(wx.EVT_MENU, self.OnWindowTile, id=ID.WINDOW_TILE)
         t.Bind(wx.EVT_MENU, t.OnWindowZoom, id=ID.WINDOW_ZOOM)
+        t.Bind(wx.EVT_MENU, t.OnSetWindowTitle, id=ID.SET_TITLE)
         t.Bind(wx.EVT_MENU, self.OnQuit, id=wx.ID_EXIT)
         t.Bind(wx.EVT_MENU, self.OnYieldToTerminal, id=ID.YIELD_TO_TERMINAL)
 
@@ -292,7 +302,7 @@ class App(wx.App):
 
         Returns
         -------
-        Result : list | str | None
+        result : list | str | None
             Paths(s) or False.
         """
         style = wx.FD_OPEN
@@ -481,6 +491,10 @@ class App(wx.App):
         frame = self._get_active_frame()
         frame.OnSetMarkedChannels(event)
 
+    def OnSetWindowTitle(self, event):
+        frame = self._get_active_frame()
+        frame.OnSetWindowTitle(event)
+
     def OnUndo(self, event):
         frame = self._get_active_frame()
         frame.OnUndo(event)
@@ -589,6 +603,10 @@ class App(wx.App):
         else:
             event.Enable(False)
 
+    def OnUpdateUISetWindowTitle(self, event):
+        frame = self._get_active_frame()
+        event.Enable(getattr(frame, '_allow_user_set_title', False))
+
     def OnUpdateUITools(self, event):
         event.Enable(bool(self._get_parent_gui))
 
@@ -665,6 +683,16 @@ def get_app():
 
 
 def run(block=False):
+    """Hand over command to the GUI (quit the GUI to return to the terminal)
+
+    Parameters
+    ----------
+    block : bool
+        Block the Terminal even if the GUI is capable of being run in parallel.
+        Control returns to the Terminal when the user quits the GUI application.
+        This is also useful to prevent plots from closing at the end of a
+        script.
+    """
     app = get_app()
     if app.using_prompt_toolkit:
         if block:

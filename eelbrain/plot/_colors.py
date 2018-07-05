@@ -608,6 +608,8 @@ class ColorBar(EelFigure):
             tick_labels = tuple(map(formatter, colorbar.get_ticks()))
 
         if tick_labels is not None:
+            if clipmin is not None:
+                tick_labels = [l for l, t in zip(tick_labels, ticks) if t >= clipmin]
             axis.set_ticklabels(tick_labels)
 
         # label position/rotation

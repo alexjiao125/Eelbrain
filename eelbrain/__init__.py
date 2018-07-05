@@ -32,6 +32,7 @@ from ._ndvar import (
     neighbor_correlation, psd_welch, rename_dim, resample, segment, set_parc,
     set_tmin,
 )
+from ._stats.testnd import NDTest, MultiEffectNDTest
 from ._trf import boosting, BoostingResult
 from ._utils import set_log_level
 from ._utils.com import check_for_update

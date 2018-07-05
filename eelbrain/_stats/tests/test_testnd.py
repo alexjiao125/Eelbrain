@@ -17,13 +17,14 @@ from eelbrain import (Dataset, NDVar, Categorial, Scalar, UTS, Sensor, configure
 from eelbrain._exceptions import ZeroVariance
 from eelbrain._stats.testnd import (Connectivity, _ClusterDist, label_clusters,
                                     _MergedTemporalClusterDist, find_peaks)
+from eelbrain._utils.system import IS_WINDOWS
 from eelbrain._utils.testing import (assert_dataobj_equal, assert_dataset_equal,
                                      requires_mne_sample_data)
 
 
 def test_anova():
     "Test testnd.anova()"
-    ds = datasets.get_uts(True)
+    ds = datasets.get_uts(True, nrm=True)
 
     testnd.anova('utsnd', 'A*B', ds=ds)
     for samples in (0, 2):
@@ -33,11 +34,12 @@ def test_anova():
         res = testnd.anova('utsnd', 'A*B', ds=ds, samples=samples, tfce=True)
         eq_(res._plot_model(), 'A%B')
 
-    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, samples=0, pmin=0.05)
-    eq_(repr(res), "<anova 'utsnd', 'A*B*rm', samples=0, pmin=0.05, "
+    res = testnd.anova('utsnd', 'A*B*rm', match=False, ds=ds, samples=0, pmin=0.05)
+    eq_(repr(res), "<anova 'utsnd', 'A*B*rm', match=False, samples=0, pmin=0.05, "
                    "'A': 17 clusters, 'B': 20 clusters, 'A x B': 22 clusters>")
     eq_(res._plot_model(), 'A%B')
-    res = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, samples=2, pmin=0.05)
+    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, samples=2, pmin=0.05)
+    assert res.match == 'rm'
     eq_(repr(res), "<anova 'utsnd', 'A*B*rm', match='rm', samples=2, pmin=0.05, "
                    "'A': 17 clusters, p=.000, 'B': 20 clusters, p=.000, "
                    "'A x B': 22 clusters, p=.000>")
@@ -49,11 +51,9 @@ def test_anova():
     assert_equal(repr(res_), repr(res))
     eq_(res_._plot_model(), 'A%B')
 
-    # missing match parameter
-    assert_raises(TypeError, testnd.anova, 'utsnd', 'A*B*rm', ds=ds, samples=10)
-
     # threshold-free
-    res = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, samples=10)
+    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, samples=10)
+    assert res.match == 'rm'
     repr(res)
     assert_in('A clusters', res.clusters.info)
     assert_in('B clusters', res.clusters.info)
@@ -73,15 +73,17 @@ def test_anova():
     assert_equal(set(res.clusters['effect'].cells), set(res.effects))
 
     # some effects with clusters, some without
-    res = testnd.anova('uts', 'A*B*rm', match='rm', ds=ds, samples=5, pmin=0.05,
+    res = testnd.anova('uts', 'A*B*rm', ds=ds, samples=5, pmin=0.05,
                        tstart=0.37, mintime=0.02)
+    assert res.match == 'rm'
     string = pickle.dumps(res, pickle.HIGHEST_PROTOCOL)
     res_ = pickle.loads(string)
     assert_dataobj_equal(res.clusters, res_.clusters)
 
     # test multi-effect results (with persistence)
     # UTS
-    res = testnd.anova('uts', 'A*B*rm', match='rm', ds=ds, samples=5)
+    res = testnd.anova('uts', 'A*B*rm', ds=ds, samples=5)
+    assert res.match == 'rm'
     repr(res)
     string = pickle.dumps(res, pickle.HIGHEST_PROTOCOL)
     resr = pickle.loads(string)
@@ -95,29 +97,30 @@ def test_anova():
     assert_array_equal(masked.x <= unmasked.x, True)
 
     # reproducibility
-    res0 = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, pmin=0.05, samples=5)
-    res = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, pmin=0.05, samples=5)
-    assert_dataset_equal(res.clusters, res0.clusters)
+    decimal = 12 if IS_WINDOWS else None  # FIXME: why is Windows sometimes different???
+    res0 = testnd.anova('utsnd', 'A*B*rm', ds=ds, pmin=0.05, samples=5)
+    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, pmin=0.05, samples=5)
+    assert_dataset_equal(res.clusters, res0.clusters, decimal=decimal)
     configure(n_workers=0)
-    res = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, pmin=0.05, samples=5)
-    assert_dataset_equal(res.clusters, res0.clusters)
+    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, pmin=0.05, samples=5)
+    assert_dataset_equal(res.clusters, res0.clusters, decimal=decimal)
     configure(n_workers=True)
 
     # permutation
     eelbrain._stats.permutation._YIELD_ORIGINAL = 1
     samples = 4
     # raw
-    res = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, samples=samples)
+    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, samples=samples)
     for dist in res._cdist:
         eq_(len(dist.dist), samples)
         assert_array_equal(dist.dist, dist.parameter_map.abs().max())
     # TFCE
-    res = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, tfce=True, samples=samples)
+    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, tfce=True, samples=samples)
     for dist in res._cdist:
         eq_(len(dist.dist), samples)
         assert_array_equal(dist.dist, dist.tfce_map.abs().max())
     # thresholded
-    res = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, pmin=0.05, samples=samples)
+    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, pmin=0.05, samples=samples)
     clusters = res.find_clusters()
     for dist, effect in zip(res._cdist, res.effects):
         effect_idx = clusters.eval("effect == %r" % effect)
@@ -128,13 +131,19 @@ def test_anova():
 
     # 1d TFCE
     configure(n_workers=0)
-    res = testnd.anova('utsnd.rms(time=(0.1, 0.3))', 'A*B*rm', match='rm', ds=ds, tfce=True, samples=samples)
+    res = testnd.anova('utsnd.rms(time=(0.1, 0.3))', 'A*B*rm', ds=ds, tfce=True, samples=samples)
     configure(n_workers=True)
 
     # zero variance
     ds['utsnd'].x[:, 1, 10] = 0.
-    assert_raises(ZeroVariance, testnd.anova, 'utsnd', 'A', match='rm', ds=ds)
-    assert_raises(ZeroVariance, testnd.anova, 'utsnd', 'A*B*rm', match='rm', ds=ds)
+    assert_raises(ZeroVariance, testnd.anova, 'utsnd', 'A', ds=ds)
+    assert_raises(ZeroVariance, testnd.anova, 'utsnd', 'A*B*rm', ds=ds)
+
+    # nested random effect
+    res = testnd.anova('uts', 'A * B * nrm(A)', ds=ds, samples=10, tstart=.4)
+    assert res.match == 'nrm(A)'
+    assert [p.min() for p in res.p] == [0.0, 0.6, 0.9]
+
 
 
 def test_anova_incremental():
@@ -639,9 +648,9 @@ def test_merged_temporal_cluster_dist():
     ds1 = datasets.get_uts()
     ds2 = datasets.get_uts(seed=42)
 
-    anova_kw = dict(Y='uts', X='A*B*rm', match='rm', pmin=0.05, samples=10)
-    ttest_kw = dict(Y='uts', X='A', c1='a1', c0='a0', pmin=0.05, samples=10)
-    contrast_kw = dict(Y='uts', X='A', contrast='a1>a0', pmin=0.05, samples=10)
+    anova_kw = dict(y='uts', x='A*B*rm', match='rm', pmin=0.05, samples=10)
+    ttest_kw = dict(y='uts', x='A', c1='a1', c0='a0', pmin=0.05, samples=10)
+    contrast_kw = dict(y='uts', x='A', contrast='a1>a0', pmin=0.05, samples=10)
 
     def test_merged(res1, res2):
         merged_dist = _MergedTemporalClusterDist([res1._cdist, res2._cdist])

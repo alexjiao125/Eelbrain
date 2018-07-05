@@ -77,6 +77,7 @@ Functions and modules for loading specific file formats as Eelbrain object:
    :toctree: generated
 
    load.wav
+   load.tsv
    load.eyelink
    load.fiff
    load.txt
@@ -345,15 +346,15 @@ Plot sensor layout maps:
    plot.SensorMaps
 
 
-Xax parameter
+xax parameter
 =============
 
-Many plots have an ``Xax`` parameter which is used to sort the data in ``Y``
-into different categories and plot them on separate axes. ``Xax`` can be
-specified through categorial data, or as a dimension in ``Y``.
+Many plots have an ``xax`` parameter which is used to sort the data in ``y``
+into different categories and plot them on separate axes. ``xax`` can be
+specified through categorial data, or as a dimension in ``y``.
 
-If a categorial data object is specified for ``Xax``, ``Y`` is split into the
-categories in ``Xax``, and for every cell in ``Xax`` a separate subplot is
+If a categorial data object is specified for ``xax``, ``y`` is split into the
+categories in ``xax``, and for every cell in ``xax`` a separate subplot is
 shown. For example, while
 
     >>> plot.Butterfly('meg', ds=ds)
@@ -362,10 +363,10 @@ will create a single Butterfly plot of the average response,
 
     >>> plot.Butterfly('meg', 'subject', ds=ds)
 
-where ``'subject'`` is the ``Xax`` parameter, will create a separate subplot
+where ``'subject'`` is the ``xax`` parameter, will create a separate subplot
 for every subject with its average response.
 
-A dimension on ``Y`` can be specified through a string starting with ``.``.
+A dimension on ``y`` can be specified through a string starting with ``.``.
 For example, to plot each case of ``meg`` separately, use::
 
    >>> plot.Butterfly('meg', '.case', ds=ds)

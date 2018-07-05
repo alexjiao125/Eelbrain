@@ -48,7 +48,7 @@ def difference(y, x, c1, c0, match, by=None, sub=None, ds=None):
         out.add(ct.groups[c1])
         if not ct.all_within:
             raise ValueError("Design is not fully balanced")
-        yname = y if isinstance(y, str) else ct.Y.name
+        yname = y if isinstance(y, str) else ct.y.name
         out[yname] = ct.data[c1] - ct.data[c0]
     else:
         by = ascategorial(by, sub, ds)
@@ -56,7 +56,7 @@ def difference(y, x, c1, c0, match, by=None, sub=None, ds=None):
         if not ct.all_within:
             raise ValueError("Design is not fully balanced")
 
-        yname = y if isinstance(y, str) else ct.Y.name
+        yname = y if isinstance(y, str) else ct.y.name
         dss = []
         if isinstance(c1, str):
             c1 = (c1,)
@@ -435,11 +435,11 @@ def stats(y, row, col=None, match=None, sub=None, fmt='%.4g', funcs=[np.mean],
     a0   0.1668    -0.3646
     a1   -0.4897   0.8746
 
-    >>> A.table.stats(Y, condition, funcs=[np.mean, np.std])
+    >>> table.stats('Y', 'A', ds=ds, funcs=[np.mean, np.std])
     Condition   mean     std
-    ----------------------------
-    control     0.0512   0.08075
-    test        0.2253   0.2844
+    --------------------------
+    a0          0.6691   1.37
+    a1          0.8596   1.192
 
     """
     sub = assub(sub, ds)
@@ -548,14 +548,14 @@ def repmeas(y, x, match, sub=None, ds=None):
         raise ValueError("Incomplete data")
 
     out = Dataset()
-    x_ = ct.groups[ct.X.cells[0]]
+    x_ = ct.groups[ct.x.cells[0]]
     if isinstance(x_, Interaction):
         for f in x_.base:
             out.add(f)
     else:
         out[ct.match.name] = x_
 
-    for cell in ct.X.cells:
+    for cell in ct.x.cells:
         if len(ct.data[cell]):  # for models with empty cells
             key = as_legal_dataset_key(cellname(cell, '_'))
             out[key] = ct.data[cell]

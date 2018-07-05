@@ -182,7 +182,7 @@ class Array(TimeSlicerEF, ColorMapMixin, XAxisMixin, EelFigure):
     ----------
     y : (list of) NDVar
         Data to plot.
-    Xax : None | categorial
+    xax : None | categorial
         Create a separate plot for each cell in this model.
     xlabel, ylabel : bool | str
         Labels for x- and y-axis; the default is determined from the data.
@@ -190,7 +190,7 @@ class Array(TimeSlicerEF, ColorMapMixin, XAxisMixin, EelFigure):
         Add tick-labels to the x-axis. Specify which axes should carry
         x-axis tick labels using ``int`` axes indices (default ``-1``).
     ds : None | Dataset
-        If a Dataset is provided, ``epochs`` and ``Xax`` can be specified
+        If a Dataset is provided, ``epochs`` and ``xax`` can be specified
         as strings.
     sub : str | array
         Specify a subset of the data.
@@ -210,8 +210,9 @@ class Array(TimeSlicerEF, ColorMapMixin, XAxisMixin, EelFigure):
         :meth:`~matplotlib.axes.Axes.imshow`). Matplotlib 1.5.3's SVG output
         can't handle uneven aspect with ``interpolation='none'``, use
         ``interpolation='nearest'`` instead.
-    xlim : (scalar, scalar)
-        Initial x-axis view limits (default is the full x-axis in the data).
+    xlim : scalar | (scalar, scalar)
+        Initial x-axis view limits as ``(left, right)`` tuple or as ``length``
+        scalar (default is the full x-axis in the data).
     tight : bool
         Use matplotlib's tight_layout to expand all axes to fill the figure
         (default True)
@@ -230,11 +231,11 @@ class Array(TimeSlicerEF, ColorMapMixin, XAxisMixin, EelFigure):
     """
     _name = "Array"
 
-    def __init__(self, y, Xax=None, xlabel=True, ylabel=True,
+    def __init__(self, y, xax=None, xlabel=True, ylabel=True,
                  xticklabels=-1, ds=None, sub=None, x='time', vmax=None,
                  vmin=None, cmap=None, axtitle=True, interpolation=None,
                  xlim=None, *args, **kwargs):
-        data = PlotData.from_args(y, (x, None), Xax, ds, sub)
+        data = PlotData.from_args(y, (x, None), xax, ds, sub)
         xdim, ydim = data.dims
         self.plots = []
         ColorMapMixin.__init__(self, data.data, cmap, vmax, vmin, None, self.plots)
@@ -388,7 +389,7 @@ class Butterfly(TimeSlicerEF, LegendMixin, TopoMapKey, YLimMixin, XAxisMixin,
     linewidth : scalar
         Linewidth for plots (defult is to use ``matplotlib.rcParams``).
     ds : None | Dataset
-        If a Dataset is provided, ``epochs`` and ``Xax`` can be specified
+        If a Dataset is provided, ``epochs`` and ``xax`` can be specified
         as strings.
     sub : str | array
         Specify a subset of the data.
@@ -398,8 +399,9 @@ class Butterfly(TimeSlicerEF, LegendMixin, TopoMapKey, YLimMixin, XAxisMixin,
         Top of the y axis (default depends on data).
     vmin : scalar
         Bottom of the y axis (default depends on data).
-    xlim : (scalar, scalar)
-        Initial x-axis view limits (default is the full x-axis in the data).
+    xlim : scalar | (scalar, scalar)
+        Initial x-axis view limits as ``(left, right)`` tuple or as ``length``
+        scalar (default is the full x-axis in the data).
     clip : bool
         Clip lines outside of axes (default ``True``).
     tight : bool

@@ -9,6 +9,8 @@ Hopkins, K. D. (1976). A Simplified Method for Determining Expected Mean
     Squares and Error Terms in the Analysis of Variance. Journal of
     Experimental Education, 45(2), 13--18.
 """
+from collections import OrderedDict
+
 import numpy as np
 from scipy.linalg import lstsq
 import scipy.stats
@@ -51,10 +53,10 @@ def hopkins_ems(x):
         raise x._incomplete_error("Hopkins E(MS) estimate")
     elif not any(f.random for f in find_factors(x)):
         raise ValueError(
-            "Need at least one random effect in fully specified model "
-            "(got %s)" % x.name)
+            f"model={x.name}; need at least one random effect in a fully "
+            f"specified model")
 
-    return {id(e): _find_hopkins_ems(e, x) for e in x.effects}
+    return tuple(_find_hopkins_ems(e, x) for e in x.effects)
 
 
 def _hopkins_ems_array(x):
@@ -79,16 +81,14 @@ def _hopkins_test(e, e2):
     """
     if e is e2:
         return False
-    else:
-        e_factors = find_factors(e)
-        e2_factors = find_factors(e2)
-
-        a = all((f in e_factors or f.random) for f in e2_factors)
-        b = all((f in e2_factors or isnestedin(e2, f) or
-                 any(isnestedin(f2, f) for f2 in e2_factors)) for
-                 f in e_factors)
-
-        return a and b
+    e_factors = find_factors(e)
+    e2_factors = find_factors(e2)
+    return (
+        all((f in e_factors or f.random) for f in e2_factors)
+        and all((f in e2_factors or isnestedin(e2, f)
+                 or any(isnestedin(f2, f) for f2 in e2_factors))
+                for f in e_factors)
+    )
 
 
 def _find_hopkins_ems(e, x):
@@ -105,78 +105,78 @@ class LM(object):
         Test of the null-hypothesis that the model does not explain a
         significant amount of the variance in the dependent variable.
     """
-    def __init__(self, Y, X, sub=None, ds=None):
-        """Fit the model X to the dependent variable Y
+    def __init__(self, y, x, sub=None, ds=None):
+        """Fit the model x to the dependent variable y
 
         Parameters
         ----------
-        Y : Var
+        y : Var
             Dependent variable.
-        X : Model
+        x : Model
             Model.
         sub : None | index
             Only use part of the data
         """
         # prepare input
         sub = assub(sub, ds)
-        Y = asvar(Y, sub, ds)
-        X = asmodel(X, sub, ds)
+        y = asvar(y, sub, ds)
+        x = asmodel(x, sub, ds)
 
-        assert len(Y) == len(X)
-        assert X.df_error > 0
+        assert len(y) == len(x)
+        assert x.df_error > 0
 
         # fit
-        p = X._parametrize()
+        p = x._parametrize()
         if _lm_lsq == 0:  # use scipy (faster)
-            beta, SS_res, _, _ = lstsq(p.x, Y.x)
+            beta, SS_res, _, _ = lstsq(p.x, y.x)
         elif _lm_lsq == 1:  # Fox
             # estimate least squares approximation
-            beta = np.dot(p.projector, Y.x)
+            beta = np.dot(p.projector, y.x)
             # estimate
             y_est = np.dot(p.x, beta)
-            self._residuals = residuals = Y.x - y_est
+            self._residuals = residuals = y.x - y_est
             SS_res = np.sum(residuals ** 2)
         else:
             raise ValueError
 
         # SS total
-        SS_total = self.SS_total = np.sum((Y.x - Y.mean()) ** 2)
-        df_total = self.df_total = X.df_total
+        SS_total = self.SS_total = np.sum((y.x - y.mean()) ** 2)
+        df_total = self.df_total = x.df_total
         self.MS_total = SS_total / df_total
 
         # SS residuals
         self.SS_res = SS_res
-        df_res = self.df_res = X.df_error
+        df_res = self.df_res = x.df_error
         self.MS_res = SS_res / df_res
 
         # SS explained
         SS_model = self.SS = self.SS_model = SS_total - SS_res
-        df_model = self.df = self.df_model = X.df - 1  # don't count intercept
+        df_model = self.df = self.df_model = x.df - 1  # don't count intercept
         self.MS_model = self.MS = SS_model / df_model
 
         # store stuff
-        self.Y = Y
-        self.X = X
+        self.y = y
+        self.x = x
         self._p = p
         self.sub = sub
         self.beta = beta
 
     def __repr__(self):
         # repr kwargs
-        args = [self.Y.name, self.X.name]
+        args = [self.y.name, self.x.name]
         if self.sub:
             args.append('sub=%r' % getattr(self.sub, 'name', '<...>'))
         return "LM(%s)" % ', '.join(args)
 
     def anova(self, title='ANOVA', empty=True, ems=False):
         """ANOVA table for the linear model"""
-        X = self.X
+        x = self.x
         values = np.dot(self._p.x, self.beta)
 
-        if X.df_error == 0:
-            e_ms = hopkins_ems(X)
-        elif hasrandom(X):
-            raise X._incomplete_error("Mixed effects ANOVA")
+        if x.df_error == 0:
+            e_ms = hopkins_ems(x)
+        elif hasrandom(x):
+            raise x._incomplete_error("Mixed effects ANOVA")
         else:
             e_ms = False
 
@@ -185,7 +185,7 @@ class LM(object):
         if title:
             table.title(title)
 
-        if not isbalanced(X):
+        if not isbalanced(x):
             table.caption("Warning: Model is unbalanced, use anova class")
 
         table.cell()
@@ -200,20 +200,20 @@ class LM(object):
         # MS for factors (Needed for models involving random effects)
         MSs = {}
         SSs = {}
-        for e in X.effects:
-            idx = X.full_index[e]
+        for e in x.effects:
+            idx = x.full_index[e]
             SSs[e] = SS = np.sum(values[:, idx].sum(1) ** 2)
             MSs[e] = (SS / e.df)
 
         # table body
         results = {}
-        for e in X.effects:
+        for i, e in enumerate(x.effects):
             MS = MSs[e]
             if e_ms:
-                e_EMS = e_ms[id(e)]
-                df_d = sum(c.df for c in e_EMS)
-                MS_d = sum(MSs[c] for c in e_EMS)
-                e_ms_name = ' + '.join(repr(c) for c in e_EMS)
+                e_ems = e_ms[i]
+                df_d = sum(c.df for c in e_ems)
+                MS_d = sum(MSs[c] for c in e_ems)
+                e_ms_name = ' + '.join(repr(c) for c in e_ems)
             else:
                 df_d = self.df_res
                 MS_d = self.MS_res
@@ -268,7 +268,7 @@ class LM(object):
         """
         # header
         table = fmtxt.Table('l' * 4)
-        df = self.X.df_error
+        df = self.x.df_error
         table.cell()
         table.cell('\\beta', mat=True)
         table.cell('T_{%i}' % df, mat=True)
@@ -276,8 +276,8 @@ class LM(object):
         table.midrule()
         # body
         q = 1
-        ne = len(self.X.effects)
-        for ie, e in enumerate(self.X.effects):
+        ne = len(self.x.effects)
+        for ie, e in enumerate(self.x.effects):
             table.cell(e.name + ':')
             table.endline()
             for i, name in enumerate(e.beta_labels):  # Fox pp. 106 ff.
@@ -296,7 +296,7 @@ class LM(object):
 
     @LazyProperty
     def residuals(self):
-        return self.Y.x - np.dot(self._p.x, self.beta)
+        return self.y.x - np.dot(self._p.x, self.beta)
 
 
 def _nd_anova(x):
@@ -337,7 +337,7 @@ class _NDANOVA(object):
         Parameters
         ----------
         y : np.array (n_cases, ...)
-            Assumes that the first dimension of Y provides cases.
+            Assumes that the first dimension of y provides cases.
             Other than that, shape is free to vary and output shape will match
             input shape.
         perm : None | array (n_cases, )
@@ -349,7 +349,7 @@ class _NDANOVA(object):
             A list with maps of F values (order corresponding to self.effects).
         """
         if y.shape[0] != self._n_obs:
-            raise ValueError("Y has wrong number of observations (%i, model "
+            raise ValueError("y has wrong number of observations (%i, model "
                              "has %i)" % (y.shape[0], self._n_obs))
 
         # find result container
@@ -469,7 +469,7 @@ class _BalancedMixedNDANOVA(_BalancedNDANOVA):
     """
     def __init__(self, x):
         e_ms = hopkins_ems(x)
-        df_den = tuple(sum(e_.df for e_ in e_ms[id(e)]) for e in x.effects)
+        df_den = tuple(sum(e.df for e in ms_effects) for ms_effects in e_ms)
         keep = tuple(i for i, df in enumerate(df_den) if df)
         effects = tuple(x.effects[i] for i in keep)
         dfs_denom = tuple(df_den[i] for i in keep)
@@ -484,13 +484,7 @@ class _BalancedMixedNDANOVA(_BalancedNDANOVA):
 class _IncrementalNDANOVA(_NDANOVA):
     def __init__(self, x):
         comparisons = IncrementalComparisons(x)
-        if comparisons.mixed:
-            dfs_denom = tuple(comparisons.models[i].df - 1 for i in
-                              (comparisons._ems_idx[id(e_test)] for e_test in
-                               comparisons.effects))
-        else:
-            dfs_denom = (x.df_error,) * len(comparisons.effects)
-        _NDANOVA.__init__(self, x, comparisons.effects, dfs_denom)
+        _NDANOVA.__init__(self, x, comparisons.effects, comparisons.dfs_denom)
 
         self._comparisons = comparisons
         self._SS_diff = None
@@ -560,13 +554,14 @@ class _IncrementalNDANOVA(_NDANOVA):
         # incremental comparisons
         if not self._comparisons.mixed:
             np.divide(SS_res[0], self.x.df_error, MS_e)
-        for i, (e_test, i1, i0) in enumerate(self._comparisons.comparisons):
+        for i, (i_test, (i1, i0)) in enumerate(self._comparisons.comparisons.items()):
             if self._comparisons.mixed:
-                i_ems = self._comparisons._ems_idx[id(e_test)]
+                i_ems = self._comparisons.ems_idx[i_test]
                 np.subtract(SS_res[self._full_ss_i], SS_res[i_ems], MS_e)
                 np.divide(MS_e, self.dfs_denom[i], MS_e)
+            df_diff = self._comparisons.x.effects[i_test].df
             np.subtract(SS_res[i0], SS_res[i1], SS_diff)
-            np.divide(SS_diff, e_test.df, MS_diff)
+            np.divide(SS_diff, df_diff, MS_diff)
             np.divide(MS_diff, MS_e, flat_f_map[i])
 
 
@@ -582,14 +577,21 @@ class IncrementalComparisons(object):
     x : Model
         Model for which to derive incremental comparisons.
 
-    Returns
-    -------
-    comparisons : list of (effect, int model_1, int model_0) tuples
-        Comparisons to test each effect in x.
+    Attributes
+    ----------
+    mixed : bool
+        Model contains any random effect.
+    effects : tuple[Effect]
+        All testable effects.
+    dfs_denom : tuple[int]
+        Denominator df for each effect.
     models : dict {int -> Model}
         Models as indexed from comparisons.
-    skipped : list of (effect, reason) tuples
-        Effects that can't be tested.
+    comparisons : {int: (int, int)}
+        Comparisons for testable effects in x; ordered dictionary mapping
+        ``{effect_id: (model_1_id, int model_0_id)}``.
+    ems_idx : list[Union[int, None]]
+        For each effect, the model-id of the E(MS) model.
     """
     def __init__(self, x):
         if x.df_error == 0:
@@ -601,19 +603,17 @@ class IncrementalComparisons(object):
         else:
             raise ValueError("Model Overdetermined")
 
-        self.comparisons = []  # (Effect, int m1, int m0)
+        self.x = x
+        self.comparisons = OrderedDict()  # {effect_i: (model1_id, model0_id)}
         self.models = {0: x}  # int -> Model
         relevant_models = set()
-        self.skipped = []
         model_idxs = {effect_id(x.effects): 0}  # effect tuple -> ind
         next_idx = 1
-        self._ems_idx = {}
+        self.ems_idx = []
 
         if is_mixed:
-            ems = hopkins_ems(x)
             # find relevant models for E(MS) computation
-            for e_test in x.effects:
-                e_ms_effects = ems[id(e_test)]
+            for e_test, e_ms_effects in zip(x.effects, hopkins_ems(x)):
                 if not e_ms_effects:
                     idx = None
                 else:
@@ -625,10 +625,10 @@ class IncrementalComparisons(object):
                         next_idx += 1
                         self.models[idx] = Model(e_ms_effects)
                         relevant_models.add(idx)
-                self._ems_idx[id(e_test)] = idx
+                self.ems_idx.append(idx)
 
         # Find comparisons for each effect
-        for e_test in x.effects:
+        for i_test, e_test in enumerate(x.effects):
             model0_effects = tuple(e for e in x.effects if e is not e_test and
                                    not is_higher_order_effect(e, e_test))
             model0_id = effect_id(model0_effects)
@@ -652,10 +652,10 @@ class IncrementalComparisons(object):
                 df_res_0 = model0.df_error
 
             if e_test.df > df_res_0:
-                self.skipped.append((e_test, "overspecified"))
+                # print(f"Skipping {e_test}: overspecified")
                 continue
-            elif is_mixed and self._ems_idx[id(e_test)] is None:
-                self.skipped.append((e_test, "no E(MS)"))
+            elif is_mixed and self.ems_idx[i_test] is None:
+                # print("Skipping {e_test}: no E(MS)")
                 continue
             elif idx0 not in self.models:
                 self.models[idx0] = model0
@@ -671,28 +671,32 @@ class IncrementalComparisons(object):
                 self.models[idx1] = Model(model1_effects)
 
             # store comparison
-            self.comparisons.append((e_test, idx1, idx0))
+            self.comparisons[i_test] = (idx1, idx0)
             relevant_models.add(idx1)
             relevant_models.add(idx0)
 
         # for i_ss, model in self.models.iteritems()
 
         self.relevant_models = tuple((self.models[idx], idx) for idx in relevant_models)
-        self.effects = tuple(item[0] for item in self.comparisons)
+        self.effects = tuple(x.effects[i] for i in self.comparisons.keys())
+        if self.mixed:
+            self.dfs_denom = tuple(self.models[self.ems_idx[i_test]].df - 1 for i_test in self.comparisons)
+        else:
+            self.dfs_denom = (self.x.df_error,) * len(self.effects)
 
     def __repr__(self):
-        return "IncrementalComparisons(%s)" % self.x.name
+        return f"IncrementalComparisons({self.x.name})"
 
     def __str__(self):
         out = ["Incremental comparisons:"]
-        for e_test, i1, i0 in self.comparisons:
-            out.append("  %s > %s" % (e_test.name, self.models[i0].name))
-        if self._ems_idx:
+        for i_test, (_, m0) in self.comparisons.items():
+            out.append(f"  {self.x.effects[i_test].name} > {self.models[m0].name}")
+        if self.mixed:
             out.append("E(MS):")
-            for e_test, i1, i0 in self.comparisons:
-                if id(e_test) in self._ems_idx:
-                    ems = self._ems_idx[id(e_test)]
-                    out.append("  %s: %s" % (e_test.name, "N/A" if ems is None else self.models[ems].name))
+            for i_test in self.comparisons:
+                ems = self.ems_idx[i_test]
+                desc = "N/A" if ems is None else self.models[ems].name
+                out.append(f"  {self.x.effects[i_test].name}: {desc}")
         return '\n'.join(out)
 
 
@@ -780,7 +784,7 @@ class ANOVA(object):
     y : Var
         dependent variable
     x : Model
-        Model to fit to Y
+        Model to fit to y
     sub : index
         Only use part of the data.
     title : str
@@ -846,21 +850,18 @@ class ANOVA(object):
                              ('Mixed' if comparisons.mixed else 'Fixed'))
             is_mixed = self._is_mixed = comparisons.mixed
 
-            # store info on skipped effects
-            for e_test, reason in comparisons.skipped:
-                self._log.append("SKIPPING: %s (%s)" % (e_test.name, reason))
-
             # fit the models
             lms = {idx: LM(y, model) if model.df_error > 0 else None for
                    model, idx in comparisons.relevant_models}
 
             # incremental F-tests
-            for e_test, i1, i0 in comparisons.comparisons:
+            for i_test, (i1, i0) in comparisons.comparisons.items():
+                e_test = comparisons.x.effects[i_test]
                 lm0 = lms[i0]
                 lm1 = lms[i1]
 
                 if is_mixed:
-                    lm_ems = lms[comparisons._ems_idx[id(e_test)]]
+                    lm_ems = lms[comparisons.ems_idx[i_test]]
                     ms_e = lm_ems.MS_model
                     df_e = lm_ems.df_model
                 else:
@@ -957,7 +958,7 @@ def anova(y, x, sub=None, title=None, ds=None):
     y : Var
         dependent variable
     x : Model
-        Model to fit to Y
+        Model to fit to y
     sub : index
         Only use part of the data.
     title : str

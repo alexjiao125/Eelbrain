@@ -255,8 +255,8 @@ def p_map(p_map, param_map=None, p0=0.05, p1=0.01, p0alpha=0.5, *args,
 
     Parameters
     ----------
-    p_map : NDVar | Result
-        Map of p values, or test-result.
+    p_map : NDVar | NDTest
+        Map of p values, or test result.
     param_map : NDVar
         Statistical parameter covering the same data points as p_map. Only the
         sign is used, for incorporating the directionality of the effect into
@@ -330,12 +330,12 @@ def p_map(p_map, param_map=None, p0=0.05, p1=0.01, p0alpha=0.5, *args,
 
     >>> brain.plot_colorbar(clipmax=0)
     """
-    from .._stats.testnd import _Result, _MultiEffectResult
+    from .._stats.testnd import NDTest, MultiEffectNDTest
 
-    if isinstance(p_map, _Result):
+    if isinstance(p_map, NDTest):
+        if isinstance(p_map, MultiEffectNDTest):
+            raise NotImplementedError(f"plot.brain.p_map for {p_map.__class__.__name__}")
         res = p_map
-        if isinstance(p_map, _MultiEffectResult):
-            raise NotImplementedError
         p_map = res.p
         param_map = res.t
     p_map, lut, vmax = p_lut(p_map, param_map, p0, p1, p0alpha)
@@ -472,7 +472,10 @@ def brain(src, cmap=None, vmin=None, vmax=None, surf='inflated',
         ``Brain.add_data()`` argument).
     mask : bool | matplotlib color
         Shade areas that are not in ``src``. Can be matplotlib color, including
-        alpha (e.g., ``(1, 1, 1, 0.5)`` for semi-transparent white).
+        alpha (e.g., ``(1, 1, 1, 0.5)`` for semi-transparent white). If
+        smoothing  is enabled through ``smoothing_steps``, the mask is added as
+        data layer, otherwise it is added as label. To add a mask independently,
+        use the :meth:`Brain.add_mask` method.
     subjects_dir : None | str
         Override the subjects_dir associated with the source space dimension.
     name : str
@@ -543,13 +546,8 @@ def brain(src, cmap=None, vmin=None, vmax=None, surf='inflated',
                             time_label)
 
     if mask is not False:
-        if mask is True:
-            color = (0, 0, 0)
-            alpha = 0.5
-        else:
-            color = mask
-            alpha = None
-        brain.add_mask(source, color, smoothing_steps, alpha, subjects_dir)
+        color = (0, 0, 0, 0.5) if mask is True else mask
+        brain.add_mask(source, color, smoothing_steps, None, subjects_dir)
 
     if parallel:
         brain.set_parallel_view(scale=True)
@@ -1315,8 +1313,8 @@ def copy(brain):
     return brain.copy_screenshot()
 
 
-def butterfly(y, cmap=None, vmin=None, vmax=None, hemi=None, name=None, h=2.5,
-              w=5):
+def butterfly(y, cmap=None, vmin=None, vmax=None, hemi=None, xlim=None,
+              name=None, h=2.5, w=5):
     """Shortcut for a Butterfly-plot with a time-linked brain plot
 
     Parameters
@@ -1332,6 +1330,9 @@ def butterfly(y, cmap=None, vmin=None, vmax=None, hemi=None, name=None, h=2.5,
     hemi : 'lh' | 'rh'
         Plot only this hemisphere (the default is to plot all hemispheres with
         data in ``y``).
+    xlim : scalar | (scalar, scalar)
+        Initial x-axis view limits as ``(left, right)`` tuple or as ``length``
+        scalar (default is the full x-axis in the data).
     name : str
         The window title (default is y.name).
     h : scalar
@@ -1353,7 +1354,7 @@ def butterfly(y, cmap=None, vmin=None, vmax=None, hemi=None, name=None, h=2.5,
     from ._utsnd import Butterfly
 
     if isinstance(y, (testnd.ttest_1samp, testnd.ttest_rel, testnd.ttest_ind)):
-        y = y.masked_parameter_map(0.05, name=y.Y)
+        y = y.masked_parameter_map(0.05, name=y.y)
 
     if name is None:
         name = y.name
@@ -1375,7 +1376,7 @@ def butterfly(y, cmap=None, vmin=None, vmax=None, hemi=None, name=None, h=2.5,
 
     # butterfly-plot
     plot_data = [y.sub(source=hemi_, name=hemi_.capitalize()) for hemi_ in hemis]
-    p = Butterfly(plot_data, vmin=vmin, vmax=vmax,
+    p = Butterfly(plot_data, vmin=vmin, vmax=vmax, xlim=xlim,
                   h=h, w=w, ncol=1, name=name, color='black', ylabel=False)
 
     # position the brain window next to the butterfly-plot

@@ -22,7 +22,7 @@ plot.Topomap("meg.sub(time=.07)", 'side', ds=ds)
 
 # plot topography at a specific time point for one condition;
 # clip with a circular outline
-plot.Topomap("meg.sub(side=='L', time=.07)", ds=ds, clip='circular')
+plot.Topomap("meg.sub(side=='L', time=.07)", ds=ds, clip='circle')
 
 # plot topography with a specific projection
 plot.Topomap("meg.sub(time=.07)", proj='back', ds=ds)

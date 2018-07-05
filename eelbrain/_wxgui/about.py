@@ -2,13 +2,14 @@
 
 import wx
 
-from .. import __version__
 from .._wxutils import Icon
 from .frame import EelbrainFrame
 
 
 class AboutFrame(EelbrainFrame):
     def __init__(self, parent):
+        from .. import __version__
+
         EelbrainFrame.__init__(self, parent, -1, "", style=wx.CLOSE_BOX)
 
         sizer = wx.BoxSizer(wx.VERTICAL)

@@ -37,3 +37,4 @@ doc/generated
 distribute-*
 scripts/eelbrain_alias.py
 *.c
+*.fif

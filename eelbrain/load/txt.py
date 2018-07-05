@@ -9,6 +9,7 @@ Tools for loading data from text files.
 '''
 import os
 import re
+from typing import Sequence, Union
 
 import numpy as np
 
@@ -19,47 +20,54 @@ from .. import _data_obj as _data
 __all__ = ('tsv', 'var')
 
 
-# could use csv module (http://docs.python.org/2/library/csv.html) but it
-# currently does not support unicode
-def tsv(path=None, names=True, types='auto', delimiter='\t', skiprows=0,
-        start_tag=None, ignore_missing=False, empty=None):
-    r"""
-    Load a :class:`Dataset` from a tab-separated values file.
+# could use csv module:  http://docs.python.org/3/library/csv.html
+def tsv(
+        path: str = None,
+        names: Union[Sequence[str], bool] = True,
+        types: Sequence[str] = None,
+        delimiter: Union[str, None] = '\t',
+        skiprows: int = 0,
+        start_tag: str = None,
+        ignore_missing: bool = False,
+        empty: str = None,
+):
+    r"""Load a :class:`Dataset` from a text file.
 
     Parameters
     ----------
-    path : None | str
-        Path to the tsv file. If None, a system file dialog will open.
-    names : list of str | bool
+    path : str
+        Path to the file (if omitted, use a system file dialog).
+    names : Sequence of str | bool
+        Column/variable names.
+
+        * ``True`` (default): look for names on the first line of the file
         * ``['name1', ...]`` use these names
-        * ``True``: look for names on the first line of the file
         * ``False``: use "v1", "v2", ...
-    types : 'auto' | list of int
-        * ``'auto'`` -> import as Var if all values can be converted float,
-          otherwise as Factor
-        * list of 0=auto, 1=Factor, 2=Var. e.g. ``[0,1,1,0]``
+    types : Sequence of int
+        Column data types, with 0=auto, 1=Factor, 2=Var (e.g. ``[0,1,1,0]``).
+        By default (and for 0), the types are inferred: if all values can be
+        converted float use :class:`Var`, otherwise use :class:`Factor`.
     delimiter : None | str
         Value delimiting cells in the input file (default: ``'\t'`` (tab);
-        None = any whitespace).
+        ``None`` = any whitespace).
     skiprows : int
         Skip so many rows at the beginning of the file (for tsv files with
-        headers). Column names (if names==True) are expected to come after
-        the skipped rows. Skiprows is applied after start_tag.
-    start_tag : None | str
+        headers). Column names are expected to come after the skipped rows.
+        ``skiprows`` is applied after ``start_tag``.
+    start_tag : str
         Alternative way to skip header rows. The table is assumed to start
         on the line following the last line in the file that starts with
         ``start_tag``.
     ignore_missing : bool
-        Ignore rows with missing values (default False). Append ``NaN`` for
-        numerical and ``""`` for categorial variables. Missing values occur when
-        not all lines in a file contain the same number of occurrences of the
-        delimiter. For reading empty values (i.e., "") see the empty_to_nan
-        argument.
+        Ignore rows with missing values (i.e., lines that contain fewer
+        ``delimiter`` than the others; by default this raises an IOError). For
+        rows with missing values, ``NaN`` is substituted for numerical and
+        ``""`` for categorial variables.
     empty : str
-        For numerical variables, substitute this value for empty entries (i.e., for
-        ""). For example, if a column in a file contains ``"5", "3", ""``, this is
-        read by default as ``Factor(['5', '3', ''])``. With ``empty='nan'``, it is
-        read as ``Var([5, 3, nan])``.
+        For numerical variables, substitute this value for empty entries (i.e.,
+        for ``""``). For example, if a column in a file contains ``['5', '3',
+        '']``, this is read by default as ``Factor(['5', '3', ''])``. With
+        ``empty='nan'``, it is read as ``Var([5, 3, nan])``.
     """
     if path is None:
         path = ui.ask_file("Load TSV", "Select tsv file to import as Dataset")
@@ -120,7 +128,10 @@ def tsv(path=None, names=True, types='auto', delimiter='\t', skiprows=0,
     if types in ('auto', None, False, True):
         types = [0] * n_cols
     else:
-        assert len(types) == n_cols
+        types = list(types)
+        if len(types) != n_cols:
+            raise ValueError('types=%r: %i values provided for file with %i '
+                             'columns' % (types, len(types), n_cols))
 
     # find quotes (imply type 1)
     quotes = "'\""

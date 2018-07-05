@@ -17,6 +17,16 @@ Then you can use::
 from eelbrain import MneExperiment
 
 
+FILTER_KWARGS = {
+    'filter_length': 'auto',
+    'l_trans_bandwidth': 'auto',
+    'h_trans_bandwidth': 'auto',
+    'phase': 'zero',
+    'fir_window': 'hamming',
+    'fir_design': 'firwin',
+}
+
+
 class SampleExperiment(MneExperiment):
 
     owner = "me@nyu.edu"
@@ -38,11 +48,37 @@ class SampleExperiment(MneExperiment):
         'modality': {(1, 2): 'auditory', (3, 4): 'visual'}
     }
 
+    raw = {
+        'tsss':    {
+            'type':   'maxwell_filter',
+            'source': 'raw',
+            'kwargs': {'st_duration':    10.,
+                       'ignore_ref':     True,
+                       'st_correlation': .9,
+                       'st_only':        True}},
+        'ica':     {
+            'type':    'ica',
+            'source':  'tsss',
+            'session': 'sample',
+            'kwargs':  {'n_components': 0.95,
+                        'random_state': 0,
+                        'method':       'fastica'}},
+        'ica1-40': {
+            'type':   'filter',
+            'source': 'ica',
+            'args':   (1, 40),
+            'kwargs': FILTER_KWARGS},
+    }
+
     epochs = {
         # all target stimuli:
         'target': {'sel': "event == 'target'", 'tmax': 0.3},
         # only auditory stimulation
-        'auditory': {'base': 'target', 'sel': "modality == 'auditory'"}
+        'auditory': {'base': 'target', 'sel': "modality == 'auditory'"},
+        # only visual stimulation
+        'visual': {'base': 'target', 'sel': "modality == 'visual'"},
+        # recombine auditory and visual
+        'av': {'sub_epochs': ('auditory', 'visual')},
     }
 
     tests = {

@@ -1,4 +1,4 @@
-'''Eelbrain GUIs'''
+"""Eelbrain GUIs"""
 
 
 def run(block=False):
@@ -9,11 +9,12 @@ def run(block=False):
     block : bool
         Block the Terminal even if the GUI is capable of being run in parallel.
         Control returns to the Terminal when the user quits the GUI application.
-        This is also useful to prevent plots form closing at the end of a 
+        This is also useful to prevent plots from closing at the end of a
         script.
     """
-    from . import _wxgui
-    _wxgui.run(block)
+    from ._wxgui import run
+
+    run(block)
 
 
 def select_components(path, ds, sysname=None):
@@ -37,8 +38,8 @@ def select_components(path, ds, sysname=None):
     ``ds``. For example, the ICA can be computed on a raw file but component
     selection done using the epochs that will be analyzed.
     """
-    from ._wxgui import get_app, run
-    from ._wxgui.select_components import Document, Model, Frame
+    from ._wxgui.app import get_app
+    from ._wxgui.select_components import TEST_MODE, Document, Frame, Model
 
     get_app()  # make sure app is created
     doc = Document(path, ds, sysname)
@@ -46,31 +47,40 @@ def select_components(path, ds, sysname=None):
     frame = Frame(None, None, None, model)
     frame.Show()
     frame.Raise()
-    run()
-    return frame
+    if TEST_MODE:
+        return frame
+    else:
+        run()
 
 
-def select_epochs(*args, **kwargs):
-    """GUI for rejecting trials
+def select_epochs(
+        ds, data='meg', accept='accept', blink='blink', tag='rej_tag',
+        trigger='trigger', path=None, nplots=None, topo=None, mean=None,
+        vlim=None, color='k', lw=0.5, mark=[], mcolor='r', mlw=0.8,
+        antialiased=True, pos=None, size=None, allow_interpolation=True):
+    """GUI for rejecting trials of MEG/EEG data
 
     Parameters
     ----------
     ds : Dataset | mne.Epochs
-        The data for which to select trials. If ds is an mne.Epochs object
-        the subsequent parameters up to 'trigger' are irrelevant.
+        The data for which to select trials. If ``ds`` is a :class:`Dataset`,
+        the subsequent parameters up to 'trigger' specify names of variables in
+        ``ds``; if ``ds`` is an :class:`mne.Epochs` object, these parameters are
+        ignored.
     data : str
-        Name of the epochs data in ds.
+        Name of the epochs data in ``ds`` (default ``'meg'``).
     accept : str
-        Name of the boolean Var in ds to accept or reject epochs.
+        Name of the boolean :class:`Var` in ``ds`` to accept or reject epochs
+        (default ``'accept'``).
     blink : str
-        Name of the eye tracker data in ds.
+        Name of the eye tracker data in ``ds`` if present (default ``'blink'``).
     tag : str
         Name of the rejection tag (storing the reason for rejecting a
-        specific epoch).
+        specific epoch; default ``'rej_tag'``).
     trigger : str
-        Name of the int Var containing the event trigger for each epoch
-        (used to assert that when loading a rejection file it comes from
-        the same data).
+        Name of the ``int`` :class:`Var` containing the event trigger for each
+        epoch (used when loading a rejection file to assert that it comes from
+        the same data; default ``'trigger'``).
     path : None | str
         Path to the desired rejection file. If the file already exists it
         is loaded as starting values. The extension determines the format
@@ -141,8 +151,17 @@ def select_epochs(*args, **kwargs):
     shift-i     open dialog to enter channels for interpolation
     =========== ============================================================
     """
-    from ._wxgui import get_app
-    from ._wxgui.select_epochs import TerminalInterface
+    from ._wxgui.app import get_app
+    from ._wxgui.select_epochs import TEST_MODE, Document, Frame, Model
 
     get_app()  # make sure app is created
-    return TerminalInterface(*args, **kwargs)
+    bad_chs = None
+    doc = Document(ds, data, accept, blink, tag, trigger, path, bad_chs, allow_interpolation)
+    model = Model(doc)
+    frame = Frame(None, model, nplots, topo, mean, vlim, color, lw, mark, mcolor, mlw, antialiased, pos, size, allow_interpolation)
+    frame.Show()
+    frame.Raise()
+    if TEST_MODE:
+        return frame
+    else:
+        run()

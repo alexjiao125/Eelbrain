@@ -32,8 +32,9 @@ class LineStack(LegendMixin, XAxisMixin, EelFigure):
         ``'0.66 * max(y)'`` will offset each line by 0.66 times the maximum 
         value in ``y`` (after aggregating if ``x`` is specified). The default is
         ``'2/3 * max(y.max(), -y.min())'``.
-    xlim : tuple of 2 scalar
-        Initial x-axis display limits.
+    xlim : scalar | (scalar, scalar)
+        Initial x-axis view limits as ``(left, right)`` tuple or as ``length``
+        scalar (default is the full x-axis in the data).
     xlabel : bool | str
         X-axis label. By default the label is inferred from the data.
     xticklabels : bool

@@ -8,7 +8,7 @@ install:
   - copy "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\vcvars64.bat" "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\amd64\vcvarsamd64.bat"  # https://github.com/conda/conda-build/issues/1606
   - C:\Miniconda-x64\Scripts\activate.bat
   - conda update --yes -n base conda
-  - conda env create -n condaenv --file env-dev3-win.yml
+  - conda env create -n condaenv --file env-dev-win.yml
   - conda activate condaenv
   - python setup.py develop
   - python -c "import mne; mne.datasets.testing.data_path()"
@@ -16,4 +16,4 @@ install:
 build: false
 
 test_script:
-  - nosetests -v
+  - pytest eelbrain

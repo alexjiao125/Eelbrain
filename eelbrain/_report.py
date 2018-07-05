@@ -88,7 +88,7 @@ def sensor_results(res, ds, color):
 
 
 def sensor_time_results(res, ds, colors, include=1):
-    y = ds.eval(res.Y)
+    y = ds.eval(res.y)
     if res._kind in ('raw', 'tfce'):
         report = Section("Results")
         section = report.add_section("P<=.05")
@@ -262,7 +262,7 @@ def source_cluster_im(ndvar, surfer_kwargs, mark_sources=None):
 def source_time_results(res, ds, colors, include=0.1, surfer_kwargs={},
                         title="Results", parc=True, y=None):
     report = Section(title)
-    y = ds[y or res.Y]
+    y = ds[y or res.y]
     if parc is True:
         parc = res._first_cdist.parc
     model = res._plot_model()
@@ -506,7 +506,7 @@ def time_results(res, ds, colors, title='Results', caption="Timecourse",
 
     Parameters
     ----------
-    res : Result
+    res : NDTest
         Result of the temporal cluster test.
     ds : Dataset
         Data.
@@ -542,7 +542,7 @@ def time_results(res, ds, colors, title='Results', caption="Timecourse",
     sub = res._plot_sub()
 
     # add UTSStat plot
-    p = plot.UTSStat(res.Y, model, None, res.match, sub, ds, colors=colors,
+    p = plot.UTSStat(res.y, model, None, res.match, sub, ds, colors=colors,
                      legend=None, clusters=clusters, show=False)
     ax = p._axes[0]
     if res.tstart is not None:
@@ -579,7 +579,7 @@ def time_results(res, ds, colors, title='Results', caption="Timecourse",
                 colors_ = colors if model_ == model else None
             else:
                 title = "Cluster %s%s: %s" % (cid, cluster['sig'], tw_str)
-            y_ = ds[res.Y].summary(time=(c_tstart, c_tstop))
+            y_ = ds[res.y].summary(time=(c_tstart, c_tstop))
             p = plot.Barplot(y_, model_, res.match, sub, ds=ds, corr=None,
                              show=False, colors=colors_, title=title)
             plots.append(p.image())
@@ -592,11 +592,11 @@ def time_results(res, ds, colors, title='Results', caption="Timecourse",
 
 
 def result_report(res, ds, title=None, colors=None):
-    """Automatically generate section from testnd Result
+    """Automatically generate section from an NDTest result object
 
     Parameters
     ----------
-    res : Result
+    res : NDTest
         Test-result.
     ds : Dataset
         Dataset containing the data on which the test was performed.

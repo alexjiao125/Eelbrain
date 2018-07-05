@@ -19,7 +19,7 @@ Total            	39.6250 	23
 import numpy as np
 from eelbrain import *
 
-Y = Var([2, 3, 3, 4,
+y = Var([2, 3, 3, 4,
          3, 4, 5, 6,
          1, 2, 1, 2, 
          1, 1, 2, 2,
@@ -35,8 +35,8 @@ hrs = Var([8, 12, 16, 24]*6, name="Hours")
 print(hrs * genot)
 
 # print ANOVA table
-print(test.anova(Y, hrs*genot, title="ANOVA"))
+print(test.anova(y, hrs*genot, title="ANOVA"))
 
 # plot the slopes
-plot.Regression(Y, hrs, genot)
+plot.Regression(y, hrs, genot)
 

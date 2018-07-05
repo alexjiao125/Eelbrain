@@ -12,56 +12,60 @@ from ._utils.numpy_utils import FULL_SLICE
 
 
 class Celltable(object):
-    """Divide Y into cells defined by X.
+    """Divide y into cells defined by x.
 
     Parameters
     ----------
-    Y : data-object
+    y : data-object
         dependent measurement
-    X : categorial
-        Model (Factor or Interaction) for dividing Y.
+    x : categorial
+        Model (Factor or Interaction) for dividing y.
     match : categorial
         Factor on which cases are matched (i.e. subject for a repeated
         measures comparisons). If several data points with the same
-        case fall into one cell of X, they are combined using
+        case fall into one cell of x, they are combined using
         match_func. If match is not None, Celltable.groups contains the
         {Xcell -> [match values of data points], ...} mapping corres-
         ponding to self.data
     sub : bool array
         Bool array of length N specifying which cases to include
-    cat : None | sequence of cells of X
+    cat : None | sequence of cells of x
         Only retain data for these cells. Data will be sorted in the order
         of cells occuring in cat.
     ds : Dataset
-        If a Dataset is specified, input items (Y / X / match / sub) can
+        If a Dataset is specified, input items (y / x / match / sub) can
         be str instead of data-objects, in which case they will be
         retrieved from the Dataset.
     coercion : callable
-        Function to convert the Y parameter to to the dependent varaible
+        Function to convert the y parameter to to the dependent varaible
         (default: asdataobject).
 
 
     Examples
     --------
-    Split a repeated-measure variable Y into cells defined by the
+    Split a repeated-measure variable y into cells defined by the
     interaction of A and B::
 
-        >>> c = Celltable(Y, A % B, match=subject)
+        >>> c = Celltable(y, A % B, match=subject)
 
 
     Attributes
     ----------
-    Y, X,
-        Y and X after sub was applied.
-    sub, match:
-        Input arguments.
+    y : data-object
+        ``y`` after evaluating input parameters.
+    x : categorial
+        ``x`` after evaluating input parameters.
+    match : categorial | None
+        ``match`` after evaluating input parameters.
+    sub : bool array | None
+        ``sub`` after evaluating input parameters.
     cells : list of (str | tuple)
-        List of all cells in X.
+        List of all cells in x.
     data : dict(cell -> data)
-        Data (``Y[index]``) in each cell.
+        Data (``y[index]``) in each cell.
     data_indexes : dict(cell -> index-array)
         For each cell, a boolean-array specifying the index for that cell in
-        ``X``.
+        ``x``.
 
     **If ``match`` is specified**:
 
@@ -77,110 +81,110 @@ class Celltable(object):
         cell.
 
     """
-    def __init__(self, Y, X=None, match=None, sub=None, cat=None, ds=None,
+    def __init__(self, y, x=None, match=None, sub=None, cat=None, ds=None,
                  coercion=asdataobject, dtype=None):
         self.sub = sub
         sub = assub(sub, ds)
 
-        if X is None:
+        if x is None:
             if cat is not None:
-                raise TypeError("cat is only a valid argument if X is provided")
-            Y = coercion(Y, sub, ds)
+                raise TypeError("cat is only a valid argument if x is provided")
+            y = coercion(y, sub, ds)
         else:
-            X = ascategorial(X, sub, ds)
+            x = ascategorial(x, sub, ds)
             if cat is not None:
                 # reconstruct cat if some cells are provided as None
                 is_none = [c is None for c in cat]
                 if any(is_none):
-                    if len(cat) == len(X.cells):
+                    if len(cat) == len(x.cells):
                         if all(is_none):
-                            cat = X.cells
+                            cat = x.cells
                         else:
-                            cells = [c for c in X.cells if c not in cat]
+                            cells = [c for c in x.cells if c not in cat]
                             cat = tuple(cells.pop(0) if c is None else c
                                         for c in cat)
                     else:
-                        err = ("Categories can only be specified as None if X "
+                        err = ("Categories can only be specified as None if x "
                                "contains exactly as many cells as categories are "
                                "required (%i)." % len(cat))
                         raise ValueError(err)
 
                 # make sure all categories are in data
-                missing = [c for c in cat if c not in X.cells]
+                missing = [c for c in cat if c not in x.cells]
                 if missing:
                     raise ValueError("Categories not in data: %s" %
                                      ', '.join(map(str, missing)))
 
                 # apply cat
-                sort_idx = X.sort_index(order=cat)
-                X = X[sort_idx]
+                sort_idx = x.sort_index(order=cat)
+                x = x[sort_idx]
                 if sub is None:
                     sub = sort_idx
                 else:
                     imax = max(len(sub), np.max(sub))
                     sub = np.arange(imax)[sub][sort_idx]
-            Y = coercion(Y, sub, ds, len(X))
+            y = coercion(y, sub, ds, len(x))
 
         if match is not None:
-            match = ascategorial(match, sub, ds, len(Y))
-            cell_model = match if X is None else X % match
+            match = ascategorial(match, sub, ds, len(y))
+            cell_model = match if x is None else x % match
             sort_idx = None
             if len(cell_model) > len(cell_model.cells):
                 # need to aggregate
-                Y = Y.aggregate(cell_model)
+                y = y.aggregate(cell_model)
                 match = match.aggregate(cell_model)
-                if X is not None:
-                    X = X.aggregate(cell_model)
+                if x is not None:
+                    x = x.aggregate(cell_model)
                     if cat is not None:
-                        sort_idx = X.sort_index(order=cat)
+                        sort_idx = x.sort_index(order=cat)
             else:
                 sort_idx = cell_model.sort_index()
-                if X is not None and cat is not None:
-                    X_ = X[sort_idx]
+                if x is not None and cat is not None:
+                    X_ = x[sort_idx]
                     sort_X_idx = X_.sort_index(order=cat)
                     sort_idx = sort_idx[sort_X_idx]
 
             if (sort_idx is not None) and (not np.all(np.diff(sort_idx) == 1)):
-                Y = Y[sort_idx]
+                y = y[sort_idx]
                 match = match[sort_idx]
-                if X is not None:
-                    X = X[sort_idx]
+                if x is not None:
+                    x = x[sort_idx]
 
-        if dtype is not None and Y.x.dtype != dtype:
-            Y = Y.astype(dtype)
+        if dtype is not None and y.x.dtype != dtype:
+            y = y.astype(dtype)
 
         # save args
-        self.Y = Y
-        self.X = X
+        self.y = y
+        self.x = x
         self.cat = cat
         self.match = match
         self.coercion = coercion.__name__
-        self.n_cases = len(Y)
+        self.n_cases = len(y)
 
         # extract cell data
         self.data = {}
         self.data_indexes = {}
-        if X is None:
-            self.data[None] = Y
+        if x is None:
+            self.data[None] = y
             self.data_indexes[None] = FULL_SLICE
             self.cells = (None,)
             self.n_cells = 1
             self.all_within = match is not None
             return
-        self.cells = cat if cat is not None else X.cells
+        self.cells = cat if cat is not None else x.cells
         self.n_cells = len(self.cells)
         self.groups = {}
-        for cell in X.cells:
-            idx = X.index_opt(cell)
+        for cell in x.cells:
+            idx = x.index_opt(cell)
             self.data_indexes[cell] = idx
-            self.data[cell] = Y[idx]
+            self.data[cell] = y[idx]
             if match:
                 self.groups[cell] = match[idx]
 
         # determine which comparisons are within subject comparisons
         if match:
             self.within = {}
-            for cell1, cell2 in combinations(X.cells, 2):
+            for cell1, cell2 in combinations(x.cells, 2):
                 group1 = self.groups[cell1]
                 if len(group1) == 0:
                     continue
@@ -197,7 +201,7 @@ class Celltable(object):
             self.all_within = False
 
     def __repr__(self):
-        args = [dataobj_repr(self.Y), dataobj_repr(self.X)]
+        args = [dataobj_repr(self.y), dataobj_repr(self.x)]
         if self.match is not None:
             args.append("match=%s" % dataobj_repr(self.match))
         if self.sub is not None:
@@ -292,7 +296,7 @@ class Celltable(object):
         ----------
         func : callable | str
             statistics function that is applied to the data. Can be string,
-            such as '[X]sem' or '[X]ci', e.g. '2sem'.
+            such as '[x]sem' or '[x]ci', e.g. '2sem'.
 
         See also
         --------
@@ -313,7 +317,7 @@ class Celltable(object):
         ----------
         func : callable | str
             statistics function that is applied to the data. Can be string,
-            such as '[X]sem', '[X]std', or '[X]ci', e.g. '2sem'.
+            such as '[x]sem', '[x]std', or '[x]ci', e.g. '2sem'.
 
         See Also
         --------
@@ -344,11 +348,11 @@ class Celltable(object):
         match = self.match if self.all_within else None
         if pool is None:
             pool = self.all_within
-        x = variability(self.Y.x, self.X, match, error, pool)
-        if isinstance(self.Y, NDVar):
-            dims = self.Y.dims[1:]
+        x = variability(self.y.x, self.x, match, error, pool)
+        if isinstance(self.y, NDVar):
+            dims = self.y.dims[1:]
             if not pool:
                 dims = (Case,) + dims
-            return NDVar(x, dims, self.Y.info.copy(), error)
+            return NDVar(x, dims, self.y.info.copy(), error)
         else:
             return x

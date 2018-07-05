@@ -4,18 +4,15 @@ import os
 from nose.tools import eq_, ok_, assert_false
 from numpy.testing import assert_array_equal
 
-import eelbrain
 from eelbrain import datasets, gui, load, set_log_level
-from eelbrain._utils.testing import requires_mne_sample_data, TempDir
+from eelbrain._utils.testing import requires_mne_sample_data, TempDir, gui_test
 from eelbrain._wxgui.select_epochs import Document, Model
 
 
+@gui_test
 @requires_mne_sample_data
 def test_select_epochs():
     "Test Select-Epochs GUI Document"
-    eelbrain._wxgui.select_epochs.TEST_MODE = True
-    eelbrain._wxgui.history.TEST_MODE = True
-
     set_log_level('warning', 'mne')
     ds = datasets.get_mne_sample(sns=True)
     tempdir = TempDir()
@@ -106,7 +103,7 @@ def test_select_epochs():
 
     # Test GUI
     # ========
-    g = gui.select_epochs(ds)
-    assert_false(g.frame.CanBackward())
-    ok_(g.frame.CanForward())
-    g.frame.OnForward(None)
+    frame = gui.select_epochs(ds)
+    assert_false(frame.CanBackward())
+    ok_(frame.CanForward())
+    frame.OnForward(None)

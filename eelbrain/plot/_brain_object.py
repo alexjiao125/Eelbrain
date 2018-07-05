@@ -15,7 +15,6 @@ import wx
 
 from .._colorspaces import to_rgb, to_rgba
 from .._data_obj import NDVar, SourceSpace
-from .._wxgui import run as run_gui
 from ..fmtxt import Image, ms
 from ..mne_fixes import reset_logger
 from ._base import (CONFIG, TimeSlicer, do_autorun, find_axis_params_data,
@@ -224,6 +223,7 @@ class Brain(TimeSlicer, surfer.Brain):
         if CONFIG['show'] and show:
             self._frame.Show()
             if CONFIG['eelbrain'] and do_autorun(run):
+                from .._wxgui import run as run_gui  # lazy import for docs
                 run_gui()
 
     def __repr__(self):
@@ -233,6 +233,9 @@ class Brain(TimeSlicer, surfer.Brain):
                         (self.n_times, ms(self._time_dim.tmin),
                          ms(self._time_dim.tstop)))
         return "<plot.brain.Brain: %s>" % ', '.join(args)
+
+    def _asfmtxt(self):
+        return self.image()
 
     def _check_source_space(self, source):
         "Make sure SourceSpace is compatible"
@@ -256,7 +259,7 @@ class Brain(TimeSlicer, surfer.Brain):
         name = label if isinstance(label, str) else label.name
         self.__labels[name] = color
 
-    def add_mask(self, source, color=(1, 1, 1), smoothing_steps=None,
+    def add_mask(self, source, color=(0, 0, 0, 0.5), smoothing_steps=None,
                  alpha=None, subjects_dir=None):
         """Add a mask shading areas that are not included in an NDVar
 
@@ -268,7 +271,8 @@ class Brain(TimeSlicer, surfer.Brain):
             Mask color, can include alpha (defauls is black with alpha=0.5:
             ``(0, 0, 0, 0.5)``).
         smoothing_steps : scalar (optional)
-            Smooth transition at the mask's border.
+            Smooth transition at the mask's border. If smoothing, the mask is
+            added as data layer, otherwise it is added as label.
         alpha : scalar
             Alpha for the mask (supercedes alpha in ``color``).
         subjects_dir : str
@@ -603,8 +607,8 @@ class Brain(TimeSlicer, surfer.Brain):
 
         Parameters
         ----------
-        p_map : NDVar
-            Statistic to plot (normally a map of p values).
+        p_map : NDVar | NDTest
+            Map of p values, or test result.
         param_map : NDVar
             Statistical parameter covering the same data points as p_map. Only the
             sign is used, for incorporating the directionality of the effect into
@@ -619,6 +623,14 @@ class Brain(TimeSlicer, surfer.Brain):
         ...
             Other parameters for :meth:`.add_ndvar`.
         """
+        from .._stats.testnd import NDTest, MultiEffectNDTest
+
+        if isinstance(p_map, NDTest):
+            if isinstance(p_map, MultiEffectNDTest):
+                raise NotImplementedError(f"plot.brain.p_map for {p_map.__class__.__name__}")
+            res = p_map
+            p_map = res.p
+            param_map = res.t
         p_map, lut, vmax = p_lut(p_map, param_map, p0, p1, p0alpha)
         self.add_ndvar(p_map, lut, -vmax, vmax, *args, **kwargs)
 

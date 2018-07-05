@@ -78,10 +78,10 @@ def test_plot_results():
     ds = datasets.get_uts(True)
 
     # ANOVA
-    res = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, samples=0, pmin=0.05)
+    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, samples=0, pmin=0.05)
     p = plot.Array(res, show=False)
     p.close()
-    res = testnd.anova('utsnd', 'A*B*rm', match='rm', ds=ds, samples=2, pmin=0.05)
+    res = testnd.anova('utsnd', 'A*B*rm', ds=ds, samples=2, pmin=0.05)
     p = plot.Array(res, show=False)
     p.close()
 

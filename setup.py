@@ -68,7 +68,10 @@ setup(
     license='BSD (3-clause)',
     long_description=DESC,
     python_requires='>=2.7',
-    setup_requires=open('requirements_install.txt').read().splitlines(),
+    setup_requires=[
+        "numpy >= 1.11",
+        "cython >= 0.21",
+    ],
     extras_require={
         'base': [
             'colormath >= 2.1',

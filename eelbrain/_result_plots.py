@@ -67,6 +67,7 @@ class PlotDestDir(object):
         self._vec_fmt = vec_fmt
         self.pix = join(root, '%s.' + pix_fmt)
         self.vec = join(root, '%s.' + vec_fmt)
+        self.mov = join(root, '%s.mov')
         self.txt = join(root, '%s.txt')
         self.name = name
         self.report = fmtxt.Report(name)
@@ -125,7 +126,7 @@ class ClusterPlotter(object):
     ----------
     ds : Dataset
         Dataset with the data on which the test is based.
-    res : Result
+    res : NDTest
         Test result object with spatio-temporal cluster test result.
     colors : dict
         Colors for plotting data in a ``{cell: color}`` dictionary.

@@ -8,10 +8,14 @@ New in 0.28
 
 * API changes:
 
+  - :class:`testnd.anova`: The ``match`` parameter is now determined
+    automatically and does not need to be specified anymore in most cases.
   - :attr:`testnd.ttest_1samp.diff` renamed to
     :attr:`testnd.ttest_1samp.difference`.
   - :class:`plot.Histogram`: following :mod:`matplotlib`, the ``normed``
     parameter was renamed to ``density``.
+  - Previously capitalized argument and attribute names ``Y``, ``X`` and ``Xax``
+    are now lowercase.
 
 
 New in 0.27

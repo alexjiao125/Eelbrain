@@ -228,7 +228,7 @@ class LMGroup(object):
             Return the individual subjects' coefficients along with test
             results.
         popmean : scalar
-            Value to compare Y against (default is 0).
+            Value to compare y against (default is 0).
         tail : 0 | 1 | -1
             Which tail of the t-distribution to consider:
             0: both (two-tailed);

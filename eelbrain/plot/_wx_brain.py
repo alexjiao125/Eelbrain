@@ -64,6 +64,7 @@ class MayaviView(HasTraits):
 
 
 class BrainFrame(EelbrainFrame):
+    _allow_user_set_title = True
 
     def __init__(self, parent, brain, title, width, height, n_rows, n_columns,
                  surf, pos):

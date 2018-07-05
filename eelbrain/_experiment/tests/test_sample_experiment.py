@@ -1,36 +1,46 @@
 # Author: Christian Brodbeck <christianbrodbeck@nyu.edu>
 """Test MneExperiment using mne-python sample data"""
-import imp
-from os.path import join, realpath
+from pathlib import Path
+from os.path import join
 
 from nose.tools import eq_, assert_raises
+import numpy as np
 
 from eelbrain import *
 from eelbrain._exceptions import DefinitionError
 from eelbrain._utils.testing import (
-    TempDir, assert_dataobj_equal, requires_mne_sample_data)
+    TempDir, assert_dataobj_equal, import_attr, requires_mne_sample_data,
+)
+
+
+sample_path = Path(__file__).parents[3] / 'examples/experiment'
 
 
 @requires_mne_sample_data
 def test_sample():
     set_log_level('warning', 'mne')
-
     # import from file:  http://stackoverflow.com/a/67692/166700
-    e_path = realpath(join(__file__, '..', '..', '..', '..', 'examples',
-                           'experiment', 'sample_experiment.py'))
-    e_module = imp.load_source('sample_experiment', e_path)
-
+    SampleExperiment = import_attr(sample_path / 'sample_experiment.py', 'SampleExperiment')
     tempdir = TempDir()
     datasets.setup_samples_experiment(tempdir, 3, 2)
 
     root = join(tempdir, 'SampleExperiment')
-    e = e_module.SampleExperiment(root)
+    e = SampleExperiment(root)
 
     eq_(e.get('subject'), 'R0000')
     eq_(e.get('subject', subject='R0002'), 'R0002')
 
-    # evoked cache invalidated by change in bads
+    # events
     e.set('R0001', rej='')
+    ds = e.load_selected_events(epoch='target')
+    assert ds.n_cases == 39
+    ds = e.load_selected_events(epoch='auditory')
+    assert ds.n_cases == 20
+    ds = e.load_selected_events(epoch='av')
+    assert ds.n_cases == 39
+    
+    # evoked cache invalidated by change in bads
+    e.set('R0001', rej='', epoch='target')
     ds = e.load_evoked()
     eq_(ds[0, 'evoked'].info['bads'], [])
     e.make_bad_channels(['MEG 0331'])
@@ -64,24 +74,36 @@ def test_sample():
     ds['n'] = Var(range(3))
     s_table = e._report_subject_info(ds, '')
 
+    # test multiple epochs with same time stamp
+    class Experiment(SampleExperiment):
+        epochs = SampleExperiment.epochs.copy()
+    Experiment.epochs['v1'] = {'base': 'visual', 'vars': {'shift': 'Var([0.0], repeat=len(side))'}}
+    Experiment.epochs['v2'] = {'base': 'visual', 'vars': {'shift': 'Var([0.1], repeat=len(side))'}}
+    Experiment.epochs['vc'] = {'sub_epochs': ('v1', 'v2'), 'post_baseline_trigger_shift': 'shift', 'post_baseline_trigger_shift_max': 0.1, 'post_baseline_trigger_shift_min': 0.0}
+    e = Experiment(root)
+    ds = e.load_epochs(baseline=True, epoch='vc')
+    v1 = ds.sub("epoch=='v1'", 'meg').sub(time=(0, 0.199))
+    v2 = ds.sub("epoch=='v2'", 'meg').sub(time=(-0.1, 0.099))
+    assert_dataobj_equal(v1, v2, decimal=20)
+
     # duplicate subject
-    class BadExperiment(e_module.SampleExperiment):
+    class BadExperiment(SampleExperiment):
         groups = {'group': ('R0001', 'R0002', 'R0002')}
     assert_raises(DefinitionError, BadExperiment, root)
 
     # non-existing subject
-    class BadExperiment(e_module.SampleExperiment):
+    class BadExperiment(SampleExperiment):
         groups = {'group': ('R0001', 'R0003', 'R0002')}
     assert_raises(DefinitionError, BadExperiment, root)
 
     # unsorted subjects
-    class Experiment(e_module.SampleExperiment):
+    class Experiment(SampleExperiment):
         groups = {'group': ('R0002', 'R0000', 'R0001')}
     e = Experiment(root)
     eq_([s for s in e], ['R0000', 'R0001', 'R0002'])
 
     # changes
-    class Changed(e_module.SampleExperiment):
+    class Changed(SampleExperiment):
         variables = {
             'event': {(1, 2, 3, 4): 'target', 5: 'smiley', 32: 'button'},
             'side': {(1, 3): 'left', (2, 4): 'right_changed'},
@@ -119,20 +141,29 @@ def test_sample():
         }
     e = Changed(root)
 
+    # ICA
+    # ---
+    e = SampleExperiment(root)
+    ica_path = e.make_ica(raw='ica')
+    e.set(raw='ica1-40', model='')
+    e.make_rej(auto=2e-12, overwrite=True)
+    ds1 = e.load_evoked(raw='ica1-40')
+    ica = e.load_ica(raw='ica')
+    ica.exclude = [0, 1, 2]
+    ica.save(ica_path)
+    ds2 = e.load_evoked(raw='ica1-40')
+    assert not np.allclose(ds1['meg'].x, ds2['meg'].x, atol=1e-20), "ICA change ignored"
+
 
 @requires_mne_sample_data
 def test_samples_sesssions():
     set_log_level('warning', 'mne')
-
-    e_path = realpath(join(__file__, '..', '..', '..', '..', 'examples',
-                           'experiment', 'sample_experiment_sessions.py'))
-    e_module = imp.load_source('sample_experiment_sessions', e_path)
-
+    SampleExperiment = import_attr(sample_path / 'sample_experiment_sessions.py', 'SampleExperiment')
     tempdir = TempDir()
     datasets.setup_samples_experiment(tempdir, 2, 1, 2)
 
     root = join(tempdir, 'SampleExperiment')
-    e = e_module.SampleExperiment(root)
+    e = SampleExperiment(root)
     # bad channels
     e.make_bad_channels('0111')
     eq_(e.load_bad_channels(), ['MEG 0111'])

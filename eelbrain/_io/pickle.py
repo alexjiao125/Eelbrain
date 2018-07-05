@@ -3,7 +3,7 @@ from pickle import dump, HIGHEST_PROTOCOL, Unpickler
 from itertools import chain
 import os
 
-from .._data_obj import NDVar
+from .._data_obj import NDVar, SourceSpace
 from .._utils import ui
 
 
@@ -136,10 +136,16 @@ def update_subjects_dir(obj, subjects_dir, depth=0):
       - list/tuple items.
     """
     if isinstance(obj, NDVar):
-        if hasattr(obj, 'source'):
-            obj.source.subjects_dir = subjects_dir
-        for v in obj.info.values():
-            update_subjects_dir(v, subjects_dir, depth)
+        for dim in obj.dims:
+            if isinstance(dim, SourceSpace):
+                if dim.subjects_dir == subjects_dir:
+                    break
+                dim.subjects_dir = subjects_dir
+                if dim._subjects_dir is not None:
+                    dim._subjects_dir = subjects_dir
+        else:
+            for v in obj.info.values():
+                update_subjects_dir(v, subjects_dir, depth)
     elif depth:
         if hasattr(obj, '__dict__'):
             values = obj.__dict__.values()

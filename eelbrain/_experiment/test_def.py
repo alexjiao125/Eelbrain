@@ -133,7 +133,13 @@ class TTestInd(TTest):
 
 
 class TTestRel(TTest):
-    "Related measures t-test"
+    """Related measures t-test
+
+    Notes
+    -----
+    For a t-test between two epochs, use an :class:`EpochCollection` epoch
+    and ``model='epoch'``.
+    """
     kind = 'ttest_rel'
 
     def __init__(self, model, c1, c0, tail=0):
@@ -191,9 +197,7 @@ class ANOVA(EvokedTest):
         self.x = x
 
     def make(self, y, ds, force_permutation, kwargs):
-        return testnd.anova(
-            y, self.x, match='subject', ds=ds,
-            force_permutation=force_permutation, **kwargs)
+        return testnd.anova(y, self.x, ds=ds, force_permutation=force_permutation, **kwargs)
 
 
 class TwoStageTest(Test):

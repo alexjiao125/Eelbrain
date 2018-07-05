@@ -1509,7 +1509,7 @@ class Table(FMTextElement):
             items.append(r"\end{center}")
         return '\n'.join(items)
 
-    def get_tsv(self, delimiter='\t', linesep='\r\n', fmt='%.9g'):
+    def get_tsv(self, delimiter='\t', linesep='\n', fmt='%.9g'):
         r"""
         Return the table as tab-separated values (TSV) string.
 
@@ -1518,7 +1518,7 @@ class Table(FMTextElement):
         delimiter : str
             Delimiter between columns (default ``'\t'``).
         linesep : str
-            Delimiter string between lines (default ``'\r\n'``).
+            Delimiter string between lines (default ``'\n'``).
         fmt : str
             Format string for numerical entries (default ``'%.9g'``).
         """
@@ -1530,7 +1530,7 @@ class Table(FMTextElement):
                 table.append(row.get_tsv(delimiter, fmt=fmt))
         return linesep.join(table)
 
-    def save_tsv(self, path=None, delimiter='\t', linesep='\r\n', fmt='%.15g'):
+    def save_tsv(self, path=None, delimiter='\t', linesep='\n', fmt='%.15g'):
         r"""
         Save the table as tab-separated values file.
 
@@ -1541,7 +1541,7 @@ class Table(FMTextElement):
         delimiter : str
             String that is placed between cells (default: ``'\t'``).
         linesep : str
-            Delimiter string between lines (default ``'\r\n'``).
+            Delimiter string between lines (default ``'\n'``).
         fmt : str
             Format string for representing numerical cells.
             (see 'Python String Formatting Documentation

@@ -24,15 +24,8 @@ class CallBackManager(object):
         self._callbacks[key] = []
 
     def callback(self, key, *args):
-        broken = []
         for cb in self._callbacks[key]:
-            try:
-                cb(*args)
-            except wx.PyDeadObjectError:
-                broken.append(cb)
-
-        for cb in broken:
-            self._callbacks[key].remove(cb)
+            cb(*args)
 
     def subscribe(self, key, func):
         self._callbacks[key].append(func)

@@ -22,18 +22,25 @@ from wx.lib.scrolledpanel import ScrolledPanel
 
 from .. import load, plot, fmtxt
 from .._data_obj import Factor, NDVar, asndvar, Categorial, Scalar
-from ..plot._topo import _ax_topomap
 from .._wxutils import Icon, ID, REValidator
 from .._utils.parse import POS_FLOAT_PATTERN
+from ..plot._topo import _ax_topomap
+from .frame import EelbrainDialog
+from .history import Action, FileDocument, FileModel, FileFrame, FileFrameChild
 from .mpl_canvas import FigureCanvasPanel
 from .text import HTMLFrame
-from .history import Action, FileDocument, FileModel, FileFrame, FileFrameChild
-from .frame import EelbrainDialog
 
 
 COLOR = {True: (.5, 1, .5), False: (1, .3, .3)}
 LINE_COLOR = {True: 'k', False: (1, 0, 0)}
 LINK = 'component:%i epoch:%s'
+TOPO_ARGS = {
+    'interpolation': 'linear',  # interpolation that does not assume continuity
+    'clip': 'even',
+}
+
+# For unit-tests
+TEST_MODE = False
 
 
 class ChangeAction(Action):
@@ -193,6 +200,10 @@ class Frame(FileFrame):
     _wildcard = "ICA fiff file (*-ica.fif)|*.fif"
 
     def __init__(self, parent, pos, size, model):
+        self.last_model = ""
+        self.source_frame = None
+        self.butterfly_baseline = ID.BASELINE_NONE
+
         super(Frame, self).__init__(parent, pos, size, model)
 
         # setup layout
@@ -243,11 +254,6 @@ class Frame(FileFrame):
         self.canvas.Unbind(wx.EVT_RIGHT_DOWN)
         self.canvas.Bind(wx.EVT_RIGHT_DOWN, self.OnRightDown)
 
-        # attributes
-        self.last_model = ""
-        self.source_frame = None
-        self.butterfly_baseline = ID.BASELINE_NONE
-
         # Finalize
         self.plot()
         self.UpdateTitle()
@@ -269,7 +275,7 @@ class Frame(FileFrame):
         axes = tuple(fig.add_subplot(n_v, n_h, i) for i in range(1, n + 1))
         # bgs = tuple(ax.patch)
         for i, ax, c, accept in zip(range(n), axes, self.doc.components, self.doc.accept):
-            _ax_topomap(ax, [c], None)
+            _ax_topomap(ax, [c], **TOPO_ARGS)
             ax.text(0.5, 1, "# %i" % i, ha='center', va='top')
             p = Rectangle((0, 0), 1, 1, color=COLOR[accept], zorder=-1)
             ax.add_patch(p)
@@ -684,7 +690,7 @@ class SourceFrame(FileFrameChild):
         for i in range(n_comp_actual):
             i_comp = self.i_first + i
             ax = self.figure.add_axes((left, 1 - (i + 1) * axheight, axwidth, axheight))
-            p = _ax_topomap(ax, [self.doc.components[i_comp]], None)
+            p = _ax_topomap(ax, [self.doc.components[i_comp]], **TOPO_ARGS)
             text = ax.text(0, 0.5, "# %i" % i_comp, va='center', ha='right', color='k')
             ax.i = i
             ax.i_comp = i_comp

@@ -145,6 +145,7 @@ class CanvasFrame(EelbrainFrame):
     # after:
     # http://matplotlib.sourceforge.net/examples/user_interfaces/embedding_in_wx2.html
     _plot_name = "CanvasFrame"
+    _allow_user_set_title = True
 
     def __init__(self, parent=None, title="Matplotlib Frame",
                  eelfigure=None,

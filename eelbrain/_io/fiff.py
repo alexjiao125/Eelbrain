@@ -544,6 +544,14 @@ def mne_epochs(ds, tmin=-0.1, tmax=None, baseline=None, i_start='i_start',
         picks = mne.pick_types(raw.info, eeg=True, eog=True, ref_meg=False)
 
     events = _mne_events(ds=ds, i_start=i_start)
+
+    # determine whether therer are non-unique timestamps (disallowed by mne)
+    _, event_index, epoch_index = np.unique(events[:, 0], return_index=True, return_inverse=True)
+    if len(event_index) == len(events):
+        epoch_index = None
+    else:
+        events = events[event_index]
+
     epochs = mne.Epochs(raw, events, None, tmin, tmax, baseline, picks,
                         preload=True, reject=reject, decim=decim, **kwargs)
     if reject is None and len(epochs) != len(events):
@@ -551,6 +559,10 @@ def mne_epochs(ds, tmin=-0.1, tmax=None, baseline=None, i_start='i_start',
             "%s: MNE generated only %i Epochs for %i events. The raw file "
             "might end before the end of the last epoch." %
             (_get_raw_filename(raw), len(epochs), len(events)))
+
+    # recast to original events
+    if epoch_index is not None:
+        epochs = epochs[epoch_index]
 
     #  add bad channels from ds
     if BAD_CHANNELS in ds.info:

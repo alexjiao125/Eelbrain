@@ -53,7 +53,7 @@ def test_t_contrasts():
     "Test computation of various t-contrasts"
     ds = datasets.get_uts()
     ct = Celltable('uts', 'A % B', 'rm', ds=ds)
-    y = ct.Y.x
+    y = ct.y.x
     out = np.empty(y.shape[1:])
     perm = np.arange(ds.n_cases)
     a1b1 = ct.data['a1', 'b1'].x

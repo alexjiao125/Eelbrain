@@ -24,11 +24,11 @@ class UTSStat(LegendMixin, XAxisMixin, YLimMixin, EelFigure):
 
     Parameters
     ----------
-    Y : 1d-NDVar
+    y : 1d-NDVar
         Dependent variable (one-dimensional NDVar).
-    X : categorial or None
+    x : categorial or None
         Model: specification of conditions which should be plotted separately.
-    Xax : None | categorial
+    xax : None | categorial
         Make separate axes for each category in this categorial model.
     match : Factor
         Identifier for repeated measures data.
@@ -75,16 +75,17 @@ class UTSStat(LegendMixin, XAxisMixin, YLimMixin, EelFigure):
         the call to matplotlib axhline call.
     xdim : str
         dimension for the x-axis (default is 'time')
-    xlim : None | (scalar, scalar)
-        Tuple of xmin and xmax to set the initial x-axis limits.
+    xlim : scalar | (scalar, scalar)
+        Initial x-axis view limits as ``(left, right)`` tuple or as ``length``
+        scalar (default is the full x-axis in the data).
     color : matplotlib color
         Color if just a single category of data is plotted.
     colors : str | list | dict
         Colors for the plots if multiple categories of data are plotted.
-        **str**: A colormap name; Cells of X are mapped onto the colormap in
+        **str**: A colormap name; Cells of ``x`` are mapped onto the colormap in
         regular intervals.
-        **list**: A list of colors in the same sequence as X.cells.
-        **dict**: A dictionary mapping each cell in X to a color.
+        **list**: A list of colors in the same sequence as ``x.cells``.
+        **dict**: A dictionary mapping each cell in ``x`` to a color.
         Colors are specified as `matplotlib compatible color arguments
         <http://matplotlib.org/api/colors_api.html>`_.
     error_alpha : float
@@ -117,7 +118,7 @@ class UTSStat(LegendMixin, XAxisMixin, YLimMixin, EelFigure):
     """
     _name = "UTSStat"
 
-    def __init__(self, Y='Y', X=None, Xax=None, match=None, sub=None, ds=None,
+    def __init__(self, y, x=None, xax=None, match=None, sub=None, ds=None,
                  main=np.mean, error='sem', pool_error=None, legend='upper right',
                  axtitle=True, xlabel=True, ylabel=True, xticklabels=-1,
                  invy=False, bottom=None, top=None, hline=None, xdim='time',
@@ -125,44 +126,44 @@ class UTSStat(LegendMixin, XAxisMixin, YLimMixin, EelFigure):
                  clusters=None, pmax=0.05, ptrend=0.1, *args, **kwargs):
         # coerce input variables
         sub = assub(sub, ds)
-        Y = asndvar(Y, sub, ds)
-        if X is not None:
-            X = ascategorial(X, sub, ds)
-        if Xax is not None:
-            Xax = ascategorial(Xax, sub, ds)
+        y = asndvar(y, sub, ds)
+        if x is not None:
+            x = ascategorial(x, sub, ds)
+        if xax is not None:
+            xax = ascategorial(xax, sub, ds)
         if match is not None:
             match = ascategorial(match, sub, ds)
 
         if error and error != 'all' and \
                 (pool_error or (pool_error is None and match is not None)):
-            all_x = [i for i in (Xax, X) if i is not None]
+            all_x = [i for i in (xax, x) if i is not None]
             if len(all_x) > 0:
                 full_x = reduce(operator.mod, all_x)
-                ct = Celltable(Y, full_x, match)
-                dev_data = stats.variability(ct.Y.x, ct.X, ct.match, error, True)
+                ct = Celltable(y, full_x, match)
+                dev_data = stats.variability(ct.y.x, ct.x, ct.match, error, True)
                 error = 'data'
             else:
                 dev_data = None
         else:
             dev_data = None
 
-        if Xax is None:
+        if xax is None:
             nax = 1
-            ct = Celltable(Y, X, match)
-            if X is None:
+            ct = Celltable(y, x, match)
+            if x is None:
                 color_x = None
             else:
-                color_x = ct.X
+                color_x = ct.x
         else:
-            ct = Celltable(Y, Xax)
-            if X is None:
+            ct = Celltable(y, xax)
+            if x is None:
                 color_x = None
                 X_ = None
             else:
-                Xct = Celltable(X, Xax)
-                color_x = Xct.Y
+                Xct = Celltable(x, xax)
+                color_x = Xct.y
             if match is not None:
-                matchct = Celltable(match, Xax)
+                matchct = Celltable(match, xax)
             nax = len(ct.cells)
 
         # assemble colors
@@ -172,13 +173,13 @@ class UTSStat(LegendMixin, XAxisMixin, YLimMixin, EelFigure):
             colors = find_cell_colors(color_x, colors)
 
         layout = Layout(nax, 2, 4, *args, autoscale='y', **kwargs)
-        EelFigure.__init__(self, frame_title(Y, X, Xax), layout)
+        EelFigure.__init__(self, frame_title(y, x, xax), layout)
         clip = layout.frame
 
         # create plots
         self._plots = []
         legend_handles = {}
-        if Xax is None:
+        if xax is None:
             p = _ax_uts_stat(self._axes[0], ct, colors, main, error, dev_data,
                              xdim, invy, bottom, top, hline, clusters,
                              pmax, ptrend, clip, error_alpha)
@@ -188,7 +189,7 @@ class UTSStat(LegendMixin, XAxisMixin, YLimMixin, EelFigure):
                 legend = False
         else:
             for i, ax, cell in zip(range(nax), self._axes, ct.cells):
-                if X is not None:
+                if x is not None:
                     X_ = Xct.data[cell]
 
                 if match is not None:
@@ -202,9 +203,9 @@ class UTSStat(LegendMixin, XAxisMixin, YLimMixin, EelFigure):
                 legend_handles.update(p.legend_handles)
             self._set_axtitle(axtitle, names=map(cellname, ct.cells))
 
-        self._configure_yaxis(ct.Y, ylabel)
-        self._configure_xaxis_dim(ct.Y.get_dim(xdim), xlabel, xticklabels)
-        XAxisMixin._init_with_data(self, ((Y,),), xdim, xlim)
+        self._configure_yaxis(ct.y, ylabel)
+        self._configure_xaxis_dim(ct.y.get_dim(xdim), xlabel, xticklabels)
+        XAxisMixin._init_with_data(self, ((y,),), xdim, xlim)
         YLimMixin.__init__(self, self._plots)
         LegendMixin.__init__(self, legend, legend_handles)
         self._update_ui_cluster_button()
@@ -318,8 +319,9 @@ class UTS(LegendMixin, YLimMixin, XAxisMixin, EelFigure):
     legend : str | int | 'fig' | None
         Matplotlib figure legend location argument or 'fig' to plot the
         legend in a separate figure.
-    xlim : (scalar, scalar)
-        Initial x-axis view limits (default is the full x-axis in the data).
+    xlim : scalar | (scalar, scalar)
+        Initial x-axis view limits as ``(left, right)`` tuple or as ``length``
+        scalar (default is the full x-axis in the data).
     tight : bool
         Use matplotlib's tight_layout to expand all axes to fill the figure
         (default True)
@@ -391,7 +393,7 @@ class _ax_uts_stat(object):
         self.stat_plots = []
         self.legend_handles = {}
 
-        x = ct.Y.get_dim(xdim)
+        x = ct.y.get_dim(xdim)
         for cell in ct.cells:
             ndvar = ct.data[cell]
             y = ndvar.get_data(('case', xdim))
@@ -563,15 +565,15 @@ class _plt_uts(object):
 
 
 class _ax_uts_clusters:
-    def __init__(self, ax, Y, clusters, color=None, pmax=0.05, ptrend=0.1,
+    def __init__(self, ax, y, clusters, color=None, pmax=0.05, ptrend=0.1,
                  xdim='time'):
-        self._bottom, self._top = _base.find_vlim_args(Y)
+        self._bottom, self._top = _base.find_vlim_args(y)
         if color is None:
-            color = Y.info.get('color')
+            color = y.info.get('color')
 
-        _plt_uts(ax, Y, xdim, color)
+        _plt_uts(ax, y, xdim, color)
 
-        if np.any(Y.x < 0) and np.any(Y.x > 0):
+        if np.any(y.x < 0) and np.any(y.x > 0):
             ax.axhline(0, color='k')
 
         # pmap
@@ -579,7 +581,7 @@ class _ax_uts_clusters:
 
         # save ax attr
         self.ax = ax
-        x = Y.get_dim(xdim)._axis_data()
+        x = y.get_dim(xdim)._axis_data()
         self.xlim = (x[0], x[-1])
 
         ax.set_xlim(*self.xlim)

@@ -251,8 +251,8 @@ class Edf(object):
         N = len(T)
         accept = np.empty(N, np.bool_)
 
-        X = tuple(self.artifacts['event'] == name for name in use)
-        idx = np.any(X, axis=0)
+        x = tuple(self.artifacts['event'] == name for name in use)
+        idx = np.any(x, axis=0)
         artifacts = self.artifacts[idx]
 
         for i, t in enumerate(T):

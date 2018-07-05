@@ -137,8 +137,12 @@ def shift_mne_epoch_trigger(epochs, trigger_shift, min_shift=None, max_shift=Non
     for i, shift in enumerate(shifts):
         new_data[i] = data[i, :, start_offset + shift:stop_offset + shift]
     tmin = epochs.tmin + (start_offset / float(epochs.info['sfreq']))
-    return mne.EpochsArray(new_data, epochs.info, epochs.events, tmin,
-                           epochs.event_id)
+
+    # update event i_start
+    events = epochs.events.copy()
+    events[:, 0] += shifts
+
+    return mne.EpochsArray(new_data, epochs.info, events, tmin, epochs.event_id)
 
 
 def labels_from_clusters(clusters, names=None):

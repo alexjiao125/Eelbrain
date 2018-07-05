@@ -1454,8 +1454,7 @@ class Frame(FileFrame):
                 mark = [ch for ch in self._mark if ch not in self.doc.bad_channel_names]
             else:
                 mark = None
-            self._topo_plot = _ax_topomap(self._topo_ax, [tseg], False,
-                                          mark=mark, **self._topo_kwargs)
+            self._topo_plot = _ax_topomap(self._topo_ax, [tseg], mark=mark, **self._topo_kwargs)
             self._topo_plot_info_str = ""
 
         self.canvas.draw()
@@ -1506,28 +1505,6 @@ class Frame(FileFrame):
             return seg
         else:
             return seg.sub(sensor=sensor_idx)
-
-
-class TerminalInterface(object):
-    def __init__(self, ds, data='meg', accept='accept', blink='blink',
-                 tag='rej_tag', trigger='trigger',
-                 path=None, nplots=None, topo=None, mean=None,
-                 vlim=None, color='k', lw=0.5, mark=[], mcolor='r', mlw=0.8,
-                 antialiased=True, pos=None, size=None,
-                 allow_interpolation=True):
-        # Documented in eelbrain.gui
-        bad_chs = None
-        self.doc = Document(ds, data, accept, blink, tag, trigger, path,
-                            bad_chs, allow_interpolation)
-        self.model = Model(self.doc)
-        self.history = self.model.history
-        self.frame = Frame(None, self.model, nplots, topo, mean, vlim, color,
-                           lw, mark, mcolor, mlw, antialiased, pos, size,
-                           allow_interpolation)
-        self.frame.Show()
-        self.frame.Raise()
-        if not TEST_MODE:
-            run()
 
 
 class FindNoisyChannelsDialog(EelbrainDialog):

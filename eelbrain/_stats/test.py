@@ -304,18 +304,18 @@ def star_factor(p, levels={.1: '`', .05: '*', .01: '**', .001: '***'}):
     return Factor(np.sum(p < level_values, 0), labels=star_labels)
 
 
-def ttest(Y, X=None, against=0, match=None, sub=None, corr='Hochberg',
+def ttest(y, x=None, against=0, match=None, sub=None, corr='Hochberg',
           title='{desc}', ds=None):
     """T tests for one or more samples.
 
     parameters
     ----------
-    Y : Var
+    y : Var
         Dependent variable
-    X : None | categorial
-        Perform tests separately for all categories in X.
+    x : None | categorial
+        Perform tests separately for all categories in x.
     against : scalar | str | tuple
-        Baseline against which to test (scalar or category in X).
+        Baseline against which to test (scalar or category in x).
     match : None | Factor
         Repeated measures factor.
     sub : index
@@ -333,15 +333,15 @@ def ttest(Y, X=None, against=0, match=None, sub=None, corr='Hochberg',
     table : FMText Table
         Table with results.
     """
-    ct = Celltable(Y, X, match, sub, ds=ds, coercion=asvar)
+    ct = Celltable(y, x, match, sub, ds=ds, coercion=asvar)
 
     par = True
     if par:
-        infl = '' if X is None else 's'
-        if ct.Y.name is None:
+        infl = '' if x is None else 's'
+        if ct.y.name is None:
             title_desc = "T-test%s against %s" % (infl, cellname(against))
         else:
-            title_desc = "T-test%s of %s against %s" % (infl, ct.Y.name, cellname(against))
+            title_desc = "T-test%s of %s against %s" % (infl, ct.y.name, cellname(against))
         statistic_name = 't'
     else:
         raise NotImplementedError
@@ -354,7 +354,7 @@ def ttest(Y, X=None, against=0, match=None, sub=None, corr='Hochberg',
 
     if isinstance(against, (str, tuple)):
         if against not in ct.cells:
-            x_repr = 'X' if ct.X.name is None else repr(ct.X.name)
+            x_repr = 'x' if ct.x.name is None else repr(ct.x.name)
             raise ValueError("agains=%r: %r is not a cell in %s"
                              % (against, against, x_repr))
         k = len(ct.cells) - 1
@@ -472,13 +472,13 @@ class TTest1Sample(object):
     """
     def __init__(self, y, match=None, sub=None, ds=None, tail=0):
         ct = Celltable(y, None, match, sub, ds=ds, coercion=asvar)
-        n = len(ct.Y)
+        n = len(ct.y)
         if n <= 2:
             raise ValueError("Not enough observations for t-test (n=%i)" % n)
 
-        self._y = dataobj_repr(ct.Y)
+        self._y = dataobj_repr(ct.y)
         self.df = n - 1
-        self.t = stats.t_1samp(ct.Y.x[:, None])[0]
+        self.t = stats.t_1samp(ct.y.x[:, None])[0]
         self.p = stats.ttest_p(self.t, self.df, tail)
         self.tail = tail
 
@@ -539,16 +539,16 @@ class TTestInd(object):
         ct = Celltable(y, x, match, sub, cat=(c1, c0), ds=ds, coercion=asvar)
         c1, c0 = ct.cat
 
-        n = len(ct.Y)
+        n = len(ct.y)
         if n <= 2:
             raise ValueError("Not enough observations for t-test (n=%i)" % n)
 
-        self._y = dataobj_repr(ct.Y)
-        self._x = dataobj_repr(ct.X)
+        self._y = dataobj_repr(ct.y)
+        self._x = dataobj_repr(ct.x)
         self.df = n - 2
-        groups = ct.X == c1
+        groups = ct.x == c1
         groups.dtype = np.int8
-        self.t = stats.t_ind(ct.Y.x[:, None], groups)[0]
+        self.t = stats.t_ind(ct.y.x[:, None], groups)[0]
         self.p = stats.ttest_p(self.t, self.df, tail)
         self.tail = tail
         self._c1 = c1
@@ -621,15 +621,15 @@ class TTestRel(object):
             raise ValueError("conditions %r and %r do not have the same values "
                              "on %s" % (c1, c0, dataobj_repr(ct.match)))
 
-        n = len(ct.Y) // 2
+        n = len(ct.y) // 2
         if n <= 2:
             raise ValueError("Not enough observations for t-test (n=%i)" % n)
 
-        self._y = dataobj_repr(ct.Y)
-        self._x = dataobj_repr(ct.X)
-        self.c1_mean = ct.Y[:n].mean()
-        self.c0_mean = ct.Y[n:].mean()
-        self.diff = ct.Y[:n] - ct.Y[n:]
+        self._y = dataobj_repr(ct.y)
+        self._x = dataobj_repr(ct.x)
+        self.c1_mean = ct.y[:n].mean()
+        self.c0_mean = ct.y[n:].mean()
+        self.diff = ct.y[:n] - ct.y[n:]
         self.df = n - 1
         self.t = stats.t_1samp(self.diff.x[:, None])[0]
         self.p = stats.ttest_p(self.t, self.df, tail)
@@ -647,7 +647,7 @@ class TTestRel(object):
                              fmtxt.peq(self.p)])
 
 
-def pairwise(Y, X, match=None, sub=None, ds=None,  # data in
+def pairwise(y, x, match=None, sub=None, ds=None,  # data in
              par=True, corr='Hochberg', trend=True,  # stats
              title='{desc}', mirror=False,  # layout
              ):
@@ -655,9 +655,9 @@ def pairwise(Y, X, match=None, sub=None, ds=None,  # data in
 
     Parameters
     ----------
-    Y : Var
+    y : Var
         Dependent measure.
-    X : categorial
+    x : categorial
         Categories to compare.
     match : None | Factor
         Repeated measures factor.
@@ -672,7 +672,7 @@ def pairwise(Y, X, match=None, sub=None, ds=None,  # data in
     table : FMText Table
         Table with results.
     """
-    ct = Celltable(Y, X, match=match, sub=sub, ds=ds, coercion=asvar)
+    ct = Celltable(y, x, match=match, sub=sub, ds=ds, coercion=asvar)
     test = _pairwise(ct.get_data(), within=ct.all_within, parametric=par,
                      corr=corr, trend=trend)
 
@@ -982,38 +982,38 @@ def _corr(y, x):
 
 
 class bootstrap_pairwise(object):
-    def __init__(self, Y, X, match=None, sub=None,
+    def __init__(self, y, x, match=None, sub=None,
                  samples=1000, replacement=True,
                  title="Bootstrapped Pairwise Tests", ds=None):
         sub = assub(sub, ds)
-        Y = asvar(Y, sub, ds)
-        X = asfactor(X, sub, ds)
-        assert len(Y) == len(X), "data length mismatch"
+        y = asvar(y, sub, ds)
+        x = asfactor(x, sub, ds)
+        assert len(y) == len(x), "data length mismatch"
         if match is not None:
             match = ascategorial(match, sub, ds)
-            assert len(match) == len(Y), "data length mismatch"
+            assert len(match) == len(y), "data length mismatch"
 
         # prepare data container
-        resampled = np.empty((samples + 1, len(Y)))  # sample X subject within category
-        resampled[0] = Y.x
+        resampled = np.empty((samples + 1, len(y)))  # sample x subject within category
+        resampled[0] = y.x
         # fill resampled
-        for i, Y_ in enumerate(resample(Y, samples, replacement, match), 1):
-            resampled[i] = Y_.x
+        for i, y_i in enumerate(resample(y, samples, replacement, match), 1):
+            resampled[i] = y_i.x
         self.resampled = resampled
 
-        cells = X.cells
+        cells = x.cells
         n_groups = len(cells)
 
         if match is not None:
-            # if there are several values per X%match cell, take the average
-            # T: indexes to transform Y.x to [X%match, value]-array
+            # if there are several values per x%match cell, take the average
+            # T: indexes to transform y.x to [x%match, value]-array
             match_cell_ids = match.cells
             group_size = len(match_cell_ids)
             T = None
             i = 0
-            for X_cell in cells:
+            for x_cell in cells:
                 for match_cell in match_cell_ids:
-                    source_indexes = np.where((X == X_cell) * (match == match_cell))[0]
+                    source_indexes = np.where((x == x_cell) * (match == match_cell))[0]
                     if T is None:
                         n_cells = n_groups * group_size
                         T = np.empty((n_cells, len(source_indexes)), dtype=int)
@@ -1047,8 +1047,8 @@ class bootstrap_pairwise(object):
         else:
             raise NotImplementedError
 
-        self._Y = Y
-        self._X = X
+        self._Y = y
+        self._X = x
         self._group_names = cells
         self._group_data = np.array([ordered[0, g] for g in groups])
         self._group_size = group_size

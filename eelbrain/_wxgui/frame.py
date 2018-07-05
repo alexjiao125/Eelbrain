@@ -85,6 +85,7 @@ class EelbrainWindow(object):
 
 
 class EelbrainFrame(wx.Frame, EelbrainWindow):
+    _allow_user_set_title = False
 
     def __init__(self, *args, **kwargs):
         wx.Frame.__init__(self, *args, **kwargs)
@@ -127,6 +128,13 @@ class EelbrainFrame(wx.Frame, EelbrainWindow):
 
     def OnSetMarkedChannels(self, event):
         raise RuntimeError(str(self))
+
+    def OnSetWindowTitle(self, event):
+        old = self.GetTitle()
+        dlg = wx.TextEntryDialog(self, f"New title for '{old}':", "Set Window Title", value=old)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.SetTitle(dlg.GetValue())
+        dlg.Destroy()
 
     def OnUndo(self, event):
         raise RuntimeError(str(self))
